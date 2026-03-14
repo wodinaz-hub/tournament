@@ -8,12 +8,12 @@
         body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; min-height: 100vh; padding: 30px 20px; }
         .wrap { max-width: 760px; margin: 0 auto; }
         .card { background: white; padding: 28px; border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
-        h1 { margin-top: 0; margin-bottom: 20px; }
+        h1 { margin-top: 0; margin-bottom: 12px; }
+        .subtitle { color: #475569; margin-bottom: 20px; }
         label { display: block; margin-bottom: 6px; font-weight: 600; }
-        .form-input, input, textarea, select {
-            width: 100%; padding: 12px 14px; margin-bottom: 12px;
-            border: 1px solid #d0d7e2; border-radius: 10px; font-size: 15px; background: white;
-        }
+        .form-input, input, textarea, select { width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid #d0d7e2; border-radius: 10px; font-size: 15px; background: white; }
+        .checkbox-row { display: flex; gap: 10px; align-items: center; margin: 8px 0 16px; }
+        .checkbox-row input { width: auto; margin: 0; }
         button { border: none; background: #16a34a; color: white; padding: 12px 16px; border-radius: 10px; font-size: 15px; cursor: pointer; }
         .back { display: inline-block; margin-left: 10px; text-decoration: none; color: #2563eb; }
         .field-errors { color: #b00020; font-size: 14px; margin: -6px 0 10px; }
@@ -24,6 +24,13 @@
     <div class="wrap">
         <div class="card">
             <h1>{% if mode == 'edit' %}Редагувати завдання{% else %}Створити завдання{% endif %}</h1>
+            <div class="subtitle">
+                {% if tournament %}
+                    Турнір: <strong>{{ tournament.name }}</strong>
+                {% else %}
+                    Завдання будуть доступні учасникам протягом усього турніру.
+                {% endif %}
+            </div>
 
             {% if form.non_field_errors %}
                 <div class="error-box">{{ form.non_field_errors }}</div>
@@ -32,9 +39,13 @@
             <form method="post">
                 {% csrf_token %}
 
-                <label>Турнір</label>
-                {{ form.tournament }}
-                {% if form.tournament.errors %}<div class="field-errors">{{ form.tournament.errors }}</div>{% endif %}
+                {% if form.tournament.is_hidden %}
+                    {{ form.tournament }}
+                {% else %}
+                    <label>Турнір</label>
+                    {{ form.tournament }}
+                    {% if form.tournament.errors %}<div class="field-errors">{{ form.tournament.errors }}</div>{% endif %}
+                {% endif %}
 
                 <label>Назва</label>
                 {{ form.title }}
@@ -52,17 +63,11 @@
                 {{ form.must_have }}
                 {% if form.must_have.errors %}<div class="field-errors">{{ form.must_have.errors }}</div>{% endif %}
 
-                <label>Час початку</label>
-                {{ form.start_time }}
-                {% if form.start_time.errors %}<div class="field-errors">{{ form.start_time.errors }}</div>{% endif %}
-
-                <label>Дедлайн</label>
-                {{ form.deadline }}
-                {% if form.deadline.errors %}<div class="field-errors">{{ form.deadline.errors }}</div>{% endif %}
-
-                <label>Статус</label>
-                {{ form.status }}
-                {% if form.status.errors %}<div class="field-errors">{{ form.status.errors }}</div>{% endif %}
+                <div class="checkbox-row">
+                    {{ form.is_draft }}
+                    <label for="{{ form.is_draft.id_for_label }}" style="margin:0;">Чернетка</label>
+                </div>
+                {% if form.is_draft.errors %}<div class="field-errors">{{ form.is_draft.errors }}</div>{% endif %}
 
                 <button type="submit">{% if mode == 'edit' %}Зберегти{% else %}Створити{% endif %}</button>
                 <a class="back" href="/admin-dashboard/">Назад</a>
@@ -71,4 +76,3 @@
     </div>
 </body>
 </html>
-

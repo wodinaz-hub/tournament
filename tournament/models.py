@@ -2,19 +2,13 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
 
 
 class Tournament(models.Model):
-    class Status(models.TextChoices):
-        DRAFT = "draft", _("Чернетка")
-        REGISTRATION = "registration", _("Реєстрація")
-        RUNNING = "running", _("Проводиться")
-        FINISHED = "finished", _("Завершено")
-
     name = models.CharField(max_length=255, verbose_name="Назва")
     description = models.TextField(verbose_name="Опис")
     start_date = models.DateTimeField(verbose_name="Дата початку")
+    end_date = models.DateTimeField(verbose_name="Дата завершення")
     registration_start = models.DateTimeField(verbose_name="Початок реєстрації")
     registration_end = models.DateTimeField(verbose_name="Завершення реєстрації")
     max_teams = models.PositiveIntegerField(
@@ -22,12 +16,7 @@ class Tournament(models.Model):
         blank=True,
         verbose_name="Максимальна кількість команд",
     )
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.DRAFT,
-        verbose_name="Статус",
-    )
+    is_draft = models.BooleanField(default=True, verbose_name="Чернетка")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -43,25 +32,46 @@ class Tournament(models.Model):
     def __str__(self):
         return self.name
 
-    @classmethod
-    def auto_update_statuses(cls):
-        """
-        Простое авто-обновление статусов по времени.
-        - если турнир уже стартовал, а статус ещё draft/registration → running
-        - если уже началась реєстрація, а статус draft → registration
-        """
+    @property
+    def lifecycle_status(self):
         now = timezone.now()
+        if self.is_draft:
+            return "draft"
+        if now > self.end_date:
+            return "finished"
+        if self.registration_start <= now <= self.registration_end:
+            return "registration"
+        if self.start_date <= now <= self.end_date:
+            return "running"
+        return "scheduled"
 
-        cls.objects.filter(
-            start_date__lte=now,
-            status__in=[cls.Status.DRAFT, cls.Status.REGISTRATION],
-        ).update(status=cls.Status.RUNNING)
+    @property
+    def lifecycle_status_label(self):
+        labels = {
+            "draft": "Чернетка",
+            "registration": "Реєстрація",
+            "running": "Йде",
+            "finished": "Завершено",
+            "scheduled": "Очікує старту",
+        }
+        return labels[self.lifecycle_status]
 
-        cls.objects.filter(
-            registration_start__lte=now,
-            registration_end__gt=now,
-            status=cls.Status.DRAFT,
-        ).update(status=cls.Status.REGISTRATION)
+    @property
+    def is_registration_open(self):
+        now = timezone.now()
+        return (
+            not self.is_draft
+            and self.registration_start <= now <= self.registration_end
+        )
+
+    @property
+    def is_running(self):
+        now = timezone.now()
+        return not self.is_draft and self.start_date <= now <= self.end_date
+
+    @property
+    def is_finished(self):
+        return timezone.now() > self.end_date
 
 
 class Team(models.Model):
@@ -99,9 +109,9 @@ class Team(models.Model):
 
 class TournamentRegistration(models.Model):
     class Status(models.TextChoices):
-        PENDING = "pending", _("Очікує")
-        APPROVED = "approved", _("Схвалено")
-        REJECTED = "rejected", _("Відхилено")
+        PENDING = "pending", "Очікує"
+        APPROVED = "approved", "Схвалено"
+        REJECTED = "rejected", "Відхилено"
 
     tournament = models.ForeignKey(
         Tournament,
@@ -141,7 +151,7 @@ class TournamentRegistration(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.team.name} → {self.tournament.name}"
+        return f"{self.team.name} -> {self.tournament.name}"
 
 
 class Participant(models.Model):
@@ -164,12 +174,6 @@ class Participant(models.Model):
 
 
 class Task(models.Model):
-    class Status(models.TextChoices):
-        DRAFT = "draft", _("Чернетка")
-        ACTIVE = "active", _("Активне")
-        SUBMISSION_CLOSED = "submission_closed", _("Прийом рішень завершено")
-        EVALUATED = "evaluated", _("Оцінено")
-
     tournament = models.ForeignKey(
         Tournament,
         on_delete=models.CASCADE,
@@ -180,14 +184,7 @@ class Task(models.Model):
     description = models.TextField(verbose_name="Опис")
     requirements = models.TextField(verbose_name="Вимоги")
     must_have = models.TextField(verbose_name="Обов'язково має бути")
-    start_time = models.DateTimeField(verbose_name="Час початку")
-    deadline = models.DateTimeField(verbose_name="Дедлайн")
-    status = models.CharField(
-        max_length=30,
-        choices=Status.choices,
-        default=Status.ACTIVE,
-        verbose_name="Статус",
-    )
+    is_draft = models.BooleanField(default=True, verbose_name="Чернетка")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -196,7 +193,7 @@ class Task(models.Model):
     )
 
     class Meta:
-        ordering = ["start_time", "title"]
+        ordering = ["title"]
         verbose_name = "Завдання"
         verbose_name_plural = "Завдання"
 
@@ -273,7 +270,7 @@ class JuryAssignment(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.jury_user} → {self.submission}"
+        return f"{self.jury_user} -> {self.submission}"
 
 
 class Evaluation(models.Model):

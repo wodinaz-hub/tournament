@@ -1,26 +1,42 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>{{ tournament.name }}</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;padding:30px 20px;color:#0f172a;}
+.wrap{max-width:980px;margin:0 auto;}
+.card{background:white;padding:24px;border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.06);margin-bottom:20px;}
+.item{border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;}
+.btn{display:inline-block;padding:10px 14px;border-radius:10px;background:#2563eb;color:white;text-decoration:none;margin-top:12px;}
+.muted{color:#64748b;}
+.pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#dcfce7;color:#166534;font-size:13px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+<a href="/participant-dashboard/" style="color:#2563eb;text-decoration:none;">← Назад</a>
 <h1>{{ tournament.name }}</h1>
-
-<h2>Завдання</h2>
-
-{% for task in tasks %}
-
-<div style="border:1px solid #ddd;padding:10px;margin-bottom:10px">
-
-<h3>{{ task.title }}</h3>
-
-<p>{{ task.description }}</p>
-
-<p><b>Deadline:</b> {{ task.deadline }}</p>
-
-<a class="btn"
-href="/task/{{ task.id }}/submit/">
-Відправити рішення
-</a>
-
+<p class="muted">{{ tournament.description }}</p>
+<p><strong>Турнір триває до:</strong> {{ tournament.end_date }}</p>
 </div>
 
+<div class="card">
+<h2>Завдання</h2>
+{% for task in tasks %}
+<div class="item">
+<span class="pill">Доступно протягом всього турніру</span>
+<h3 style="margin-top:0;">{{ task.title }}</h3>
+<p>{{ task.description }}</p>
+<p><strong>Вимоги:</strong><br>{{ task.requirements }}</p>
+<p><strong>Обов'язково має бути:</strong><br>{{ task.must_have }}</p>
+<a class="btn" href="/task/{{ task.id }}/submit/">Відправити рішення</a>
+</div>
 {% empty %}
-
-<p>Немає завдань</p>
-
+<p>Немає завдань.</p>
 {% endfor %}
+</div>
+</div>
+</body>
+</html>

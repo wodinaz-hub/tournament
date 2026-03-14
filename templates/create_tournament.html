@@ -10,10 +10,9 @@
         .card { background: white; padding: 28px; border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
         h1 { margin-top: 0; margin-bottom: 20px; }
         label { display: block; margin-bottom: 6px; font-weight: 600; }
-        .form-input, input, textarea, select {
-            width: 100%; padding: 12px 14px; margin-bottom: 12px;
-            border: 1px solid #d0d7e2; border-radius: 10px; font-size: 15px; background: white;
-        }
+        .form-input, input, textarea, select { width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid #d0d7e2; border-radius: 10px; font-size: 15px; background: white; }
+        .checkbox-row { display: flex; gap: 10px; align-items: center; margin: 8px 0 16px; }
+        .checkbox-row input { width: auto; margin: 0; }
         button { border: none; background: #16a34a; color: white; padding: 12px 16px; border-radius: 10px; font-size: 15px; cursor: pointer; }
         .back { display: inline-block; margin-left: 10px; text-decoration: none; color: #2563eb; }
         .field-errors { color: #b00020; font-size: 14px; margin: -6px 0 10px; }
@@ -44,6 +43,10 @@
                 {{ form.start_date }}
                 {% if form.start_date.errors %}<div class="field-errors">{{ form.start_date.errors }}</div>{% endif %}
 
+                <label>Дата завершення</label>
+                {{ form.end_date }}
+                {% if form.end_date.errors %}<div class="field-errors">{{ form.end_date.errors }}</div>{% endif %}
+
                 <label>Початок реєстрації</label>
                 {{ form.registration_start }}
                 {% if form.registration_start.errors %}<div class="field-errors">{{ form.registration_start.errors }}</div>{% endif %}
@@ -56,9 +59,11 @@
                 {{ form.max_teams }}
                 {% if form.max_teams.errors %}<div class="field-errors">{{ form.max_teams.errors }}</div>{% endif %}
 
-                <label>Статус</label>
-                {{ form.status }}
-                {% if form.status.errors %}<div class="field-errors">{{ form.status.errors }}</div>{% endif %}
+                <div class="checkbox-row">
+                    {{ form.is_draft }}
+                    <label for="{{ form.is_draft.id_for_label }}" style="margin:0;">Чернетка</label>
+                </div>
+                {% if form.is_draft.errors %}<div class="field-errors">{{ form.is_draft.errors }}</div>{% endif %}
 
                 <button type="submit">{% if mode == 'edit' %}Зберегти{% else %}Створити{% endif %}</button>
                 <a class="back" href="/admin-dashboard/">Назад</a>

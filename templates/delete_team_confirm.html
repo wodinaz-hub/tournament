@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Підтвердження видалення</title>
+<style>
+body{
+margin:0;
+font-family:Arial,sans-serif;
+background:#f4f6fb;
+padding:30px 20px;
+}
+
+.wrap{
+max-width:640px;
+margin:0 auto;
+}
+
+.card{
+background:white;
+padding:24px;
+border-radius:16px;
+box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+.actions{
+display:flex;
+gap:12px;
+margin-top:20px;
+align-items:center;
+}
+
+.btn{
+display:inline-block;
+padding:10px 16px;
+border-radius:10px;
+text-decoration:none;
+border:none;
+cursor:pointer;
+}
+
+.btn-red{
+background:#dc2626;
+color:white;
+}
+
+.btn-light{
+background:#e5e7eb;
+color:#111827;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+<h1>Видалити команду "{{ team.name }}"?</h1>
+<p>Ця дія видалить команду разом з учасниками, реєстраціями та надісланими роботами.</p>
+<div class="actions">
+<form method="post">
+{% csrf_token %}
+<button class="btn btn-red" type="submit">Видалити</button>
+</form>
+<a class="btn btn-light" href="{% url 'team_detail' team.id %}">Скасувати</a>
+</div>
+</div>
+</div>
+</body>
+</html>

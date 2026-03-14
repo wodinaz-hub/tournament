@@ -1,22 +1,28 @@
 from django import forms
-from .models import Tournament, Team, Participant, TournamentRegistration, Task
+
+from .models import Participant, Submission, Task, Team, Tournament, TournamentRegistration
 
 
 class TournamentForm(forms.ModelForm):
     start_date = forms.DateTimeField(
         input_formats=['%Y-%m-%dT%H:%M'],
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-input'}),
-        label='Дата початку'
+        label='Дата початку',
+    )
+    end_date = forms.DateTimeField(
+        input_formats=['%Y-%m-%dT%H:%M'],
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-input'}),
+        label='Дата завершення',
     )
     registration_start = forms.DateTimeField(
         input_formats=['%Y-%m-%dT%H:%M'],
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-input'}),
-        label='Початок реєстрації'
+        label='Початок реєстрації',
     )
     registration_end = forms.DateTimeField(
         input_formats=['%Y-%m-%dT%H:%M'],
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-input'}),
-        label='Завершення реєстрації'
+        label='Завершення реєстрації',
     )
 
     class Meta:
@@ -25,16 +31,17 @@ class TournamentForm(forms.ModelForm):
             'name',
             'description',
             'start_date',
+            'end_date',
             'registration_start',
             'registration_end',
             'max_teams',
-            'status',
+            'is_draft',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-input'}),
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 5}),
             'max_teams': forms.NumberInput(attrs={'class': 'form-input'}),
-            'status': forms.Select(attrs={'class': 'form-input'}),
+            'is_draft': forms.CheckboxInput(),
         }
 
     def clean(self):
@@ -42,12 +49,16 @@ class TournamentForm(forms.ModelForm):
         registration_start = cleaned_data.get('registration_start')
         registration_end = cleaned_data.get('registration_end')
         start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
 
         if registration_start and registration_end and registration_start >= registration_end:
             self.add_error('registration_end', 'Завершення реєстрації має бути пізніше за початок реєстрації.')
 
         if registration_end and start_date and registration_end > start_date:
             self.add_error('registration_end', 'Реєстрація має завершуватися до початку турніру.')
+
+        if start_date and end_date and end_date <= start_date:
+            self.add_error('end_date', 'Турнір має завершуватися після початку.')
 
         return cleaned_data
 
@@ -66,7 +77,6 @@ class TeamForm(forms.ModelForm):
 
 
 class ParticipantForm(forms.ModelForm):
-
     class Meta:
         model = Participant
         fields = ['full_name', 'email']
@@ -74,6 +84,7 @@ class ParticipantForm(forms.ModelForm):
             'full_name': forms.TextInput(attrs={'class': 'form-input'}),
             'email': forms.EmailInput(attrs={'class': 'form-input'}),
         }
+
 
 class TournamentRegistrationForm(forms.ModelForm):
     class Meta:
@@ -91,9 +102,7 @@ class TournamentRegistrationForm(forms.ModelForm):
         queryset = Team.objects.none()
 
         if user is not None:
-            queryset = Team.objects.filter(
-                captain_user=user
-            ).order_by('name')
+            queryset = Team.objects.filter(captain_user=user).order_by('name')
 
         if tournament is not None:
             used_team_ids = TournamentRegistration.objects.filter(
@@ -105,17 +114,6 @@ class TournamentRegistrationForm(forms.ModelForm):
 
 
 class TaskForm(forms.ModelForm):
-    start_time = forms.DateTimeField(
-        input_formats=['%Y-%m-%dT%H:%M'],
-        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-input'}),
-        label='Час початку',
-    )
-    deadline = forms.DateTimeField(
-        input_formats=['%Y-%m-%dT%H:%M'],
-        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-input'}),
-        label='Дедлайн',
-    )
-
     class Meta:
         model = Task
         fields = [
@@ -124,9 +122,7 @@ class TaskForm(forms.ModelForm):
             'description',
             'requirements',
             'must_have',
-            'start_time',
-            'deadline',
-            'status',
+            'is_draft',
         ]
         widgets = {
             'tournament': forms.Select(attrs={'class': 'form-input'}),
@@ -134,5 +130,33 @@ class TaskForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 4}),
             'requirements': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
             'must_have': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
-            'status': forms.Select(attrs={'class': 'form-input'}),
+            'is_draft': forms.CheckboxInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        tournament = kwargs.pop('tournament', None)
+        super().__init__(*args, **kwargs)
+
+        if tournament is not None:
+            self.fields['tournament'].initial = tournament
+            self.fields['tournament'].widget = forms.HiddenInput()
+            self.fields['tournament'].queryset = Tournament.objects.filter(id=tournament.id)
+
+
+class SubmissionForm(forms.ModelForm):
+    class Meta:
+        model = Submission
+        fields = [
+            'github_link',
+            'video_link',
+            'live_demo',
+            'description',
+            'is_final',
+        ]
+        widgets = {
+            'github_link': forms.URLInput(attrs={'class': 'form-input'}),
+            'video_link': forms.URLInput(attrs={'class': 'form-input'}),
+            'live_demo': forms.URLInput(attrs={'class': 'form-input'}),
+            'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 5}),
+            'is_final': forms.CheckboxInput(),
         }

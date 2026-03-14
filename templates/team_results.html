@@ -1,22 +1,103 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Результати {{ team.name }}</title>
+<style>
+body{
+margin:0;
+font-family:Arial,sans-serif;
+background:linear-gradient(180deg,#eef6ff 0%,#f8fafc 100%);
+color:#0f172a;
+padding:30px 20px;
+}
+.wrap{max-width:1100px;margin:0 auto;}
+.hero,.card{background:white;border-radius:18px;box-shadow:0 16px 40px rgba(15,23,42,.08);padding:24px;margin-bottom:20px;}
+.hero h1{margin:0 0 10px;}
+.muted{color:#64748b;}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px;}
+.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:16px;}
+.stat-value{font-size:28px;font-weight:700;}
+.grid{display:grid;gap:18px;}
+.submission-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:13px;background:#dbeafe;color:#1d4ed8;}
+.score{font-size:32px;font-weight:700;color:#0f766e;}
+.jury-list{display:grid;gap:12px;margin-top:16px;}
+.jury-item{border:1px solid #e2e8f0;border-radius:12px;padding:14px;background:#fcfdff;}
+.jury-item strong{display:block;margin-bottom:6px;}
+.links a,.back{color:#2563eb;text-decoration:none;word-break:break-all;}
+@media (max-width: 900px){.stats{grid-template-columns:repeat(2,1fr);}}
+@media (max-width: 640px){.stats{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+<a class="back" href="{% url 'team_detail' team.id %}">← Назад до команди</a>
 <h1>Результати команди {{ team.name }}</h1>
-
-{% for eval in evaluations %}
-
-<div style="border:1px solid #ddd;padding:10px;margin-bottom:10px">
-
-<b>{{ eval.assignment.submission.task.title }}</b>
-
-<p>Backend: {{ eval.score_backend }}</p>
-<p>Frontend: {{ eval.score_frontend }}</p>
-<p>Functionality: {{ eval.score_functionality }}</p>
-<p>UX: {{ eval.score_ux }}</p>
-
-<p>Total: {{ eval.total_score }}</p>
-
+<div class="muted">Тут видно всі надіслані роботи, середні бали та детальні коментарі журі.</div>
+<div class="stats">
+<div class="stat"><div class="muted">Надіслано робіт</div><div class="stat-value">{{ summary.submitted_count }}</div></div>
+<div class="stat"><div class="muted">Оцінено робіт</div><div class="stat-value">{{ summary.evaluated_count }}</div></div>
+<div class="stat"><div class="muted">Середній бал</div><div class="stat-value">{% if summary.overall_average %}{{ summary.overall_average|floatformat:1 }}{% else %}-{% endif %}</div></div>
+<div class="stat"><div class="muted">Найкращий бал</div><div class="stat-value">{% if summary.best_score %}{{ summary.best_score|floatformat:1 }}{% else %}-{% endif %}</div></div>
+</div>
 </div>
 
-{% empty %}
+<div class="grid">
+{% for row in result_rows %}
+<div class="card">
+<div class="submission-head">
+<div>
+<h2 style="margin:0 0 8px;">{{ row.submission.task.title }}</h2>
+<div class="muted">{{ row.submission.task.tournament.name }}</div>
+</div>
+<div style="text-align:right;">
+{% if row.average_score %}
+<div class="muted">Середній бал</div>
+<div class="score">{{ row.average_score|floatformat:1 }}</div>
+{% else %}
+<span class="pill">Ще не оцінено</span>
+{% endif %}
+</div>
+</div>
 
-<p>Ще немає оцінок</p>
+<div class="links muted">
+GitHub: <a href="{{ row.submission.github_link }}" target="_blank">{{ row.submission.github_link }}</a><br>
+Відео: <a href="{{ row.submission.video_link }}" target="_blank">{{ row.submission.video_link }}</a><br>
+{% if row.submission.live_demo %}Live demo: <a href="{{ row.submission.live_demo }}" target="_blank">{{ row.submission.live_demo }}</a><br>{% endif %}
+Подано: {{ row.submission.submitted_at }}
+</div>
 
+{% if row.evaluations %}
+<div class="jury-list">
+{% for evaluation in row.evaluations %}
+<div class="jury-item">
+<strong>Журі: {{ evaluation.jury_name }}</strong>
+<div class="muted">
+Backend: {{ evaluation.backend }},
+Frontend: {{ evaluation.frontend }},
+Functionality: {{ evaluation.functionality }},
+UX: {{ evaluation.ux }},
+Total: {{ evaluation.total|floatformat:1 }}
+</div>
+{% if evaluation.comment %}
+<p style="margin:10px 0 0;">{{ evaluation.comment }}</p>
+{% endif %}
+</div>
 {% endfor %}
+</div>
+{% else %}
+<p class="muted" style="margin-top:16px;">Для цієї роботи ще немає оцінок від журі.</p>
+{% endif %}
+</div>
+{% empty %}
+<div class="card">
+<h2 style="margin-top:0;">Поки немає результатів</h2>
+<p class="muted">Команда ще не надсилала робіт або оцінювання ще не розпочалося.</p>
+</div>
+{% endfor %}
+</div>
+</div>
+</body>
+</html>

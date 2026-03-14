@@ -1,18 +1,57 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>{{ task.title }}</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;padding:30px 20px;}
+.wrap{max-width:760px;margin:0 auto;}
+.card{background:white;padding:24px;border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.06);}
+label{display:block;margin-bottom:6px;font-weight:600;}
+.form-input,input,textarea{width:100%;padding:12px 14px;margin-bottom:14px;border:1px solid #d0d7e2;border-radius:10px;box-sizing:border-box;}
+.checkbox-row{display:flex;gap:10px;align-items:center;margin:8px 0 16px;}
+.checkbox-row input{width:auto;margin:0;}
+button{border:none;background:#2563eb;color:white;padding:12px 16px;border-radius:10px;cursor:pointer;}
+.back{margin-left:10px;color:#2563eb;text-decoration:none;}
+.field-errors{color:#b00020;font-size:14px;margin:-8px 0 10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
 <h1>{{ task.title }}</h1>
+<p>Турнір: <strong>{{ task.tournament.name }}</strong></p>
+<p>Команда: <strong>{{ team.name }}</strong></p>
+<p>Рішення приймаються до завершення турніру: <strong>{{ task.tournament.end_date }}</strong></p>
 
 <form method="post">
-
 {% csrf_token %}
 
-<p>GitHub link</p>
-<input name="github" required>
+<label>GitHub link</label>
+{{ form.github_link }}
+{% if form.github_link.errors %}<div class="field-errors">{{ form.github_link.errors }}</div>{% endif %}
 
-<p>Video link</p>
-<input name="video" required>
+<label>Video link</label>
+{{ form.video_link }}
+{% if form.video_link.errors %}<div class="field-errors">{{ form.video_link.errors }}</div>{% endif %}
 
-<button type="submit">
-Submit
-</button>
+<label>Live demo</label>
+{{ form.live_demo }}
+{% if form.live_demo.errors %}<div class="field-errors">{{ form.live_demo.errors }}</div>{% endif %}
 
+<label>Опис рішення</label>
+{{ form.description }}
+{% if form.description.errors %}<div class="field-errors">{{ form.description.errors }}</div>{% endif %}
+
+<div class="checkbox-row">
+{{ form.is_final }}
+<label for="{{ form.is_final.id_for_label }}" style="margin:0;">Фінальна версія</label>
+</div>
+
+<button type="submit">{% if submission %}Оновити рішення{% else %}Надіслати рішення{% endif %}</button>
+<a class="back" href="{% url 'tournament_tasks' task.tournament.id %}">Назад</a>
 </form>
-
+</div>
+</div>
+</body>
+</html>

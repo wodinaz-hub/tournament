@@ -4,43 +4,48 @@
     <meta charset="UTF-8">
     <title>Панель журі</title>
     <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6fb;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .card {
-            background: white;
-            padding: 32px;
-            border-radius: 16px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-            text-align: center;
-            width: 100%;
-            max-width: 500px;
-        }
-
-        a {
-            display: inline-block;
-            margin-top: 16px;
-            text-decoration: none;
-            color: white;
-            background: #2563eb;
-            padding: 10px 14px;
-            border-radius: 10px;
-        }
+        body { margin:0; font-family:Arial,sans-serif; background:#f4f6fb; }
+        .wrap { max-width:1000px; margin:0 auto; padding:30px 20px; }
+        .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .card { background:white; padding:20px; border-radius:16px; box-shadow:0 10px 24px rgba(0,0,0,.06); }
+        .item { border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:12px; }
+        .name { font-weight:700; margin-bottom:6px; }
+        .meta { color:#555; line-height:1.5; }
+        a.logout { text-decoration:none; background:#dc2626; color:white; padding:10px 14px; border-radius:10px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Панель журі</h1>
-        <p>Вітаю, {{ request.user.username }}</p>
-        <p>Твоя роль: {{ request.user.role }}</p>
-        <a href="/logout/">Вийти</a>
+    <div class="wrap">
+        <div class="top">
+            <div>
+                <h1>Панель журі</h1>
+                <div>Вітаю, {{ request.user.username }}</div>
+            </div>
+            <a class="logout" href="/logout/">Вийти</a>
+        </div>
+
+        <div class="card">
+            <h2>Призначені вам роботи</h2>
+
+            {% for assignment in assignments %}
+                <div class="item">
+                    <div class="name">{{ assignment.submission.team.name }} — {{ assignment.submission.task.title }}</div>
+                    <div class="meta">
+                        Турнір: {{ assignment.submission.task.tournament.name }}<br>
+                        GitHub: <a href="{{ assignment.submission.github_link }}" target="_blank">{{ assignment.submission.github_link }}</a><br>
+                        Video: <a href="{{ assignment.submission.video_link }}" target="_blank">{{ assignment.submission.video_link }}</a><br>
+                        Live demo:
+                        {% if assignment.submission.live_demo %}
+                            <a href="{{ assignment.submission.live_demo }}" target="_blank">{{ assignment.submission.live_demo }}</a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+            {% empty %}
+                <div>Поки що вам не призначено жодної роботи.</div>
+            {% endfor %}
+        </div>
     </div>
 </body>
 </html>

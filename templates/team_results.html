@@ -1,0 +1,22 @@
+<h1>Результати команди {{ team.name }}</h1>
+
+{% for eval in evaluations %}
+
+<div style="border:1px solid #ddd;padding:10px;margin-bottom:10px">
+
+<b>{{ eval.assignment.submission.task.title }}</b>
+
+<p>Backend: {{ eval.score_backend }}</p>
+<p>Frontend: {{ eval.score_frontend }}</p>
+<p>Functionality: {{ eval.score_functionality }}</p>
+<p>UX: {{ eval.score_ux }}</p>
+
+<p>Total: {{ eval.total_score }}</p>
+
+</div>
+
+{% empty %}
+
+<p>Ще немає оцінок</p>
+
+{% endfor %}

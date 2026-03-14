@@ -2,96 +2,28 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Створити турнір</title>
+    <title>{% if mode == 'edit' %}Редагувати турнір{% else %}Створити турнір{% endif %}</title>
     <style>
-        * {
-            box-sizing: border-box;
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; min-height: 100vh; padding: 30px 20px; }
+        .wrap { max-width: 760px; margin: 0 auto; }
+        .card { background: white; padding: 28px; border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
+        h1 { margin-top: 0; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; }
+        .form-input, input, textarea, select {
+            width: 100%; padding: 12px 14px; margin-bottom: 12px;
+            border: 1px solid #d0d7e2; border-radius: 10px; font-size: 15px; background: white;
         }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6fb;
-            min-height: 100vh;
-            padding: 30px 20px;
-        }
-
-        .wrap {
-            max-width: 760px;
-            margin: 0 auto;
-        }
-
-        .card {
-            background: white;
-            padding: 28px;
-            border-radius: 16px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-        }
-
-        h1 {
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-
-        .form-input,
-        input,
-        textarea,
-        select {
-            width: 100%;
-            padding: 12px 14px;
-            margin-bottom: 12px;
-            border: 1px solid #d0d7e2;
-            border-radius: 10px;
-            font-size: 15px;
-            background: white;
-        }
-
-        button {
-            border: none;
-            background: #16a34a;
-            color: white;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 15px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #15803d;
-        }
-
-        .back {
-            display: inline-block;
-            margin-left: 10px;
-            text-decoration: none;
-            color: #2563eb;
-        }
-
-        .field-errors {
-            color: #b00020;
-            font-size: 14px;
-            margin: -6px 0 10px;
-        }
-
-        .error-box {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 16px;
-        }
+        button { border: none; background: #16a34a; color: white; padding: 12px 16px; border-radius: 10px; font-size: 15px; cursor: pointer; }
+        .back { display: inline-block; margin-left: 10px; text-decoration: none; color: #2563eb; }
+        .field-errors { color: #b00020; font-size: 14px; margin: -6px 0 10px; }
+        .error-box { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; margin-bottom: 16px; }
     </style>
 </head>
 <body>
     <div class="wrap">
         <div class="card">
-            <h1>Створити турнір</h1>
+            <h1>{% if mode == 'edit' %}Редагувати турнір{% else %}Створити турнір{% endif %}</h1>
 
             {% if form.non_field_errors %}
                 <div class="error-box">{{ form.non_field_errors }}</div>
@@ -100,49 +32,35 @@
             <form method="post">
                 {% csrf_token %}
 
-                <label for="{{ form.name.id_for_label }}">Назва</label>
+                <label>Назва</label>
                 {{ form.name }}
-                {% if form.name.errors %}
-                    <div class="field-errors">{{ form.name.errors }}</div>
-                {% endif %}
+                {% if form.name.errors %}<div class="field-errors">{{ form.name.errors }}</div>{% endif %}
 
-                <label for="{{ form.description.id_for_label }}">Опис</label>
+                <label>Опис</label>
                 {{ form.description }}
-                {% if form.description.errors %}
-                    <div class="field-errors">{{ form.description.errors }}</div>
-                {% endif %}
+                {% if form.description.errors %}<div class="field-errors">{{ form.description.errors }}</div>{% endif %}
 
-                <label for="{{ form.start_date.id_for_label }}">Дата початку</label>
+                <label>Дата початку</label>
                 {{ form.start_date }}
-                {% if form.start_date.errors %}
-                    <div class="field-errors">{{ form.start_date.errors }}</div>
-                {% endif %}
+                {% if form.start_date.errors %}<div class="field-errors">{{ form.start_date.errors }}</div>{% endif %}
 
-                <label for="{{ form.registration_start.id_for_label }}">Початок реєстрації</label>
+                <label>Початок реєстрації</label>
                 {{ form.registration_start }}
-                {% if form.registration_start.errors %}
-                    <div class="field-errors">{{ form.registration_start.errors }}</div>
-                {% endif %}
+                {% if form.registration_start.errors %}<div class="field-errors">{{ form.registration_start.errors }}</div>{% endif %}
 
-                <label for="{{ form.registration_end.id_for_label }}">Завершення реєстрації</label>
+                <label>Завершення реєстрації</label>
                 {{ form.registration_end }}
-                {% if form.registration_end.errors %}
-                    <div class="field-errors">{{ form.registration_end.errors }}</div>
-                {% endif %}
+                {% if form.registration_end.errors %}<div class="field-errors">{{ form.registration_end.errors }}</div>{% endif %}
 
-                <label for="{{ form.max_teams.id_for_label }}">Максимальна кількість команд</label>
+                <label>Максимальна кількість команд</label>
                 {{ form.max_teams }}
-                {% if form.max_teams.errors %}
-                    <div class="field-errors">{{ form.max_teams.errors }}</div>
-                {% endif %}
+                {% if form.max_teams.errors %}<div class="field-errors">{{ form.max_teams.errors }}</div>{% endif %}
 
-                <label for="{{ form.status.id_for_label }}">Статус</label>
+                <label>Статус</label>
                 {{ form.status }}
-                {% if form.status.errors %}
-                    <div class="field-errors">{{ form.status.errors }}</div>
-                {% endif %}
+                {% if form.status.errors %}<div class="field-errors">{{ form.status.errors }}</div>{% endif %}
 
-                <button type="submit">Створити</button>
+                <button type="submit">{% if mode == 'edit' %}Зберегти{% else %}Створити{% endif %}</button>
                 <a class="back" href="/admin-dashboard/">Назад</a>
             </form>
         </div>

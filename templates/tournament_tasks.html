@@ -1,0 +1,26 @@
+<h1>{{ tournament.name }}</h1>
+
+<h2>Завдання</h2>
+
+{% for task in tasks %}
+
+<div style="border:1px solid #ddd;padding:10px;margin-bottom:10px">
+
+<h3>{{ task.title }}</h3>
+
+<p>{{ task.description }}</p>
+
+<p><b>Deadline:</b> {{ task.deadline }}</p>
+
+<a class="btn"
+href="/task/{{ task.id }}/submit/">
+Відправити рішення
+</a>
+
+</div>
+
+{% empty %}
+
+<p>Немає завдань</p>
+
+{% endfor %}

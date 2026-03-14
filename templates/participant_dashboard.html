@@ -1,46 +1,208 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <title>Панель учасника</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6fb;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
+<meta charset="UTF-8">
+<title>Dashboard</title>
 
-        .card {
-            background: white;
-            padding: 32px;
-            border-radius: 16px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-            text-align: center;
-            width: 100%;
-            max-width: 500px;
-        }
+<style>
 
-        a {
-            display: inline-block;
-            margin-top: 16px;
-            text-decoration: none;
-            color: white;
-            background: #2563eb;
-            padding: 10px 14px;
-            border-radius: 10px;
-        }
-    </style>
+body{
+margin:0;
+font-family:Arial;
+background:#f4f6fb;
+}
+
+.header{
+background:#111827;
+color:white;
+padding:18px 30px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.container{
+max-width:1100px;
+margin:auto;
+padding:30px;
+}
+
+.card{
+background:white;
+border-radius:14px;
+padding:20px;
+margin-bottom:20px;
+box-shadow:0 8px 18px rgba(0,0,0,.08);
+}
+
+.card h2{
+margin-top:0;
+}
+
+.btn{
+display:inline-block;
+padding:10px 16px;
+border-radius:10px;
+text-decoration:none;
+color:white;
+background:#2563eb;
+margin-top:10px;
+}
+
+.btn.disabled{
+background:#9ca3af;
+pointer-events:none;
+cursor:default;
+}
+
+.btn-green{
+background:#16a34a;
+}
+
+.btn-red{
+background:#dc2626;
+}
+
+.item{
+border:1px solid #e5e7eb;
+border-radius:10px;
+padding:12px;
+margin-bottom:10px;
+}
+
+.meta{
+color:#555;
+font-size:14px;
+}
+
+</style>
 </head>
+
+
 <body>
-    <div class="card">
-        <h1>Панель учасника</h1>
-        <p>Вітаю, {{ request.user.username }}</p>
-        <p>Твоя роль: {{ request.user.role }}</p>
-        <a href="/logout/">Вийти</a>
-    </div>
+
+<div class="header">
+<div>🏆 Tournament Platform</div>
+<div>
+{{ request.user.username }}
+<a href="/logout/" style="color:white;margin-left:15px;">Logout</a>
+</div>
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Моя команда</h2>
+
+{% if my_teams %}
+
+{% for team in my_teams %}
+
+<div class="item">
+
+<b>{{ team.name }}</b>
+
+<div class="meta">
+Капітан: {{ team.captain_name }}
+</div>
+
+<a class="btn" href="/team/{{ team.id }}/">Відкрити</a>
+
+<a class="btn btn-green" href="/team/{{ team.id }}/results/">Результати</a>
+
+</div>
+
+{% endfor %}
+
+{% else %}
+
+<p>У вас ще немає команди.</p>
+
+{% if request.user.role == "captain" %}
+<a class="btn btn-green" href="/create-team/">Створити команду</a>
+{% endif %}
+
+{% endif %}
+
+</div>
+
+
+<div class="card">
+
+<h2>Доступні турніри</h2>
+
+{% for item in tournaments_with_state %}
+
+<div class="item">
+
+<b>{{ item.tournament.name }}</b>
+
+<div class="meta">
+
+Початок: {{ item.tournament.start_date }} <br>
+Реєстрація до: {{ item.tournament.registration_end }}
+
+</div>
+
+{% if item.my_registration %}
+
+<p style="color:green;">Команда вже зареєстрована</p>
+
+{% else %}
+
+{% if request.user.role == "captain" %}
+<a class="btn btn-green"
+href="/register-team-for-tournament/{{ item.tournament.id }}/">
+Зареєструвати команду
+</a>
+{% endif %}
+
+{% endif %}
+
+<a class="btn {% if item.tournament.status != "running" %}disabled{% endif %}"
+{% if item.tournament.status == "running" %}href="/tournament/{{ item.tournament.id }}/tasks/"}{% endif %}>
+Завдання
+</a>
+
+{% if item.tournament.status != "running" %}
+<span style="color:#888;margin-left:8px;">Турнір ще не почався</span>
+{% endif %}
+
+</div>
+
+{% empty %}
+
+<p>Зараз немає активних турнірів.</p>
+
+{% endfor %}
+
+</div>
+
+
+<div class="card">
+
+<h2>Результати</h2>
+
+{% if my_teams %}
+
+{% for team in my_teams %}
+
+<a class="btn" href="/team/{{ team.id }}/results/">
+Результати команди {{ team.name }}
+</a>
+
+{% endfor %}
+
+{% else %}
+
+<p>Ви ще не в команді.</p>
+
+{% endif %}
+
+</div>
+
+</div>
+
 </body>
 </html>

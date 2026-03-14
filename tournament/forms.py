@@ -1,5 +1,5 @@
 from django import forms
-from .models import Tournament
+from .models import Tournament, Team, Participant, TournamentRegistration
 
 
 class TournamentForm(forms.ModelForm):
@@ -50,3 +50,55 @@ class TournamentForm(forms.ModelForm):
             self.add_error('registration_end', 'Реєстрація має завершуватися до початку турніру.')
 
         return cleaned_data
+
+
+class TeamForm(forms.ModelForm):
+    class Meta:
+        model = Team
+        fields = ['name', 'captain_name', 'captain_email', 'school', 'telegram']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-input'}),
+            'captain_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'captain_email': forms.EmailInput(attrs={'class': 'form-input'}),
+            'school': forms.TextInput(attrs={'class': 'form-input'}),
+            'telegram': forms.TextInput(attrs={'class': 'form-input'}),
+        }
+
+
+class ParticipantForm(forms.ModelForm):
+
+    class Meta:
+        model = Participant
+        fields = ['full_name', 'email']
+        widgets = {
+            'full_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'email': forms.EmailInput(attrs={'class': 'form-input'}),
+        }
+
+class TournamentRegistrationForm(forms.ModelForm):
+    class Meta:
+        model = TournamentRegistration
+        fields = ['team']
+        widgets = {
+            'team': forms.Select(attrs={'class': 'form-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        tournament = kwargs.pop('tournament', None)
+        super().__init__(*args, **kwargs)
+
+        queryset = Team.objects.none()
+
+        if user is not None:
+            queryset = Team.objects.filter(
+                captain_user=user
+            ).order_by('name')
+
+        if tournament is not None:
+            used_team_ids = TournamentRegistration.objects.filter(
+                tournament=tournament
+            ).values_list('team_id', flat=True)
+            queryset = queryset.exclude(id__in=used_team_ids)
+
+        self.fields['team'].queryset = queryset

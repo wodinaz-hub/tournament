@@ -1,0 +1,52 @@
+@login_required
+def register_team_for_tournament(request, tournament_id):
+
+    if request.user.role != 'captain' and not request.user.is_superuser:
+        return redirect('participant_dashboard')
+
+    tournament = get_object_or_404(
+        Tournament,
+        id=tournament_id,
+        status='registration'
+    )
+
+    already_registered = TournamentRegistration.objects.filter(
+        tournament=tournament,
+        team__captain_user=request.user
+    ).exists()
+
+    if already_registered:
+        return redirect('participant_dashboard')
+
+    if request.method == 'POST':
+
+        form = TournamentRegistrationForm(
+            request.POST,
+            user=request.user,
+            tournament=tournament,
+        )
+
+        if form.is_valid():
+
+            team = form.cleaned_data['team']
+
+            TournamentRegistration.objects.create(
+                tournament=tournament,
+                team=team,
+                registered_by=request.user,
+                status='pending',
+            )
+
+            return redirect('participant_dashboard')
+
+    else:
+
+        form = TournamentRegistrationForm(
+            user=request.user,
+            tournament=tournament,
+        )
+
+    return render(request, 'register_team_for_tournament.html', {
+        'form': form,
+        'tournament': tournament,
+    })

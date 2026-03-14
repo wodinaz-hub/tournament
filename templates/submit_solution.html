@@ -1,0 +1,18 @@
+<h1>{{ task.title }}</h1>
+
+<form method="post">
+
+{% csrf_token %}
+
+<p>GitHub link</p>
+<input name="github" required>
+
+<p>Video link</p>
+<input name="video" required>
+
+<button type="submit">
+Submit
+</button>
+
+</form>
+

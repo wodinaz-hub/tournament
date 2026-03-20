@@ -56,6 +56,53 @@ class TournamentPlatformViewTests(TestCase):
         defaults.update(overrides)
         return Tournament.objects.create(**defaults)
 
+    def test_register_form_saves_selected_role(self):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "newcaptain",
+                "email": "newcaptain@example.com",
+                "role": "captain",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("login"))
+        created_user = User.objects.get(username="newcaptain")
+        self.assertEqual(created_user.role, "captain")
+        self.assertFalse(created_user.is_approved)
+
+    def test_admin_can_create_user_from_users_tab(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_user_by_admin"),
+            {
+                "username": "manual_jury",
+                "email": "manual_jury@example.com",
+                "role": "jury",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_dashboard"))
+        created_user = User.objects.get(username="manual_jury")
+        self.assertEqual(created_user.role, "jury")
+        self.assertFalse(created_user.is_approved)
+
+    def test_admin_can_open_separate_create_user_page(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("create_user_by_admin"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Створити користувача")
+        self.assertContains(response, "Назад до адмінки")
+
     def test_participant_dashboard_shows_running_tournaments(self):
         tournament = self.create_tournament(
             name="Running Cup",
@@ -125,6 +172,275 @@ class TournamentPlatformViewTests(TestCase):
                 team=my_team,
             ).exists()
         )
+
+    def test_register_team_for_tournament_enforces_team_size_limits(self):
+        tournament = self.create_tournament(
+            min_team_members=3,
+            max_team_members=4,
+        )
+        my_team = Team.objects.create(
+            name="Small Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+
+        response = self.client.post(
+            reverse("register_team_for_tournament", args=[tournament.id]),
+            {"team": my_team.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Потрібно щонайменше: 3")
+        self.assertFalse(
+            TournamentRegistration.objects.filter(
+                tournament=tournament,
+                team=my_team,
+            ).exists()
+        )
+
+    def test_admin_can_define_registration_fields_for_tournament(self):
+        tournament = self.create_tournament()
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("edit_tournament", args=[tournament.id]),
+            {
+                "name": tournament.name,
+                "description": tournament.description,
+                "registration_form_description": "Заповніть анкету команди",
+                "registration_fields_definition": "school|Школа|text|required\ncoach_email|Email керівника|email|optional",
+                "start_date": tournament.start_date.astimezone().strftime("%Y-%m-%dT%H:%M"),
+                "end_date": tournament.end_date.astimezone().strftime("%Y-%m-%dT%H:%M"),
+                "registration_start": tournament.registration_start.astimezone().strftime("%Y-%m-%dT%H:%M"),
+                "registration_end": tournament.registration_end.astimezone().strftime("%Y-%m-%dT%H:%M"),
+                "min_team_members": "",
+                "max_team_members": "",
+                "max_teams": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_dashboard"))
+        tournament.refresh_from_db()
+        self.assertEqual(
+            tournament.registration_fields_config,
+            [
+                {"key": "school", "label": "Школа", "type": "text", "required": True},
+                {"key": "coach_email", "label": "Email керівника", "type": "email", "required": False},
+            ],
+        )
+
+    def test_registration_page_renders_dynamic_fields_and_saves_answers(self):
+        tournament = self.create_tournament(
+            registration_fields_config=[
+                {"key": "school", "label": "Школа", "type": "text", "required": True},
+                {"key": "coach_email", "label": "Email керівника", "type": "email", "required": False},
+            ],
+        )
+        my_team = Team.objects.create(
+            name="Dynamic Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+
+        response = self.client.get(reverse("register_team_for_tournament", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Школа")
+        self.assertContains(response, "Email керівника")
+
+        response = self.client.post(
+            reverse("register_team_for_tournament", args=[tournament.id]),
+            {
+                "team": my_team.id,
+                "field_school": "Ліцей №1",
+                "field_coach_email": "coach@example.com",
+            },
+        )
+
+        self.assertRedirects(response, reverse("participant_dashboard"))
+        registration = TournamentRegistration.objects.get(tournament=tournament, team=my_team)
+        self.assertEqual(registration.status, TournamentRegistration.Status.PENDING)
+        self.assertEqual(
+            registration.form_answers,
+            {"school": "Ліцей №1", "coach_email": "coach@example.com"},
+        )
+
+    def test_registration_participants_field_updates_team_members(self):
+        tournament = self.create_tournament(
+            min_team_members=3,
+            max_team_members=4,
+            registration_fields_config=[
+                {"key": "participants", "label": "Учасники", "type": "participants", "required": True},
+            ],
+        )
+        my_team = Team.objects.create(
+            name="Roster Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+
+        response = self.client.post(
+            reverse("register_team_for_tournament", args=[tournament.id]),
+            {
+                "team": my_team.id,
+                "field_participants": '[{"full_name":"Іван","email":"ivan@example.com"},{"full_name":"Марія","email":"maria@example.com"}]',
+            },
+        )
+
+        self.assertRedirects(response, reverse("participant_dashboard"))
+        registration = TournamentRegistration.objects.get(tournament=tournament, team=my_team)
+        self.assertEqual(len(registration.form_answers["participants"]), 2)
+        self.assertEqual(my_team.participants.count(), 2)
+        self.assertTrue(my_team.participants.filter(full_name="Іван", email="ivan@example.com").exists())
+        self.assertTrue(my_team.participants.filter(full_name="Марія", email="maria@example.com").exists())
+
+    def test_registration_participants_field_does_not_delete_existing_team_members(self):
+        tournament = self.create_tournament(
+            min_team_members=2,
+            max_team_members=4,
+            registration_fields_config=[
+                {"key": "participants", "label": "Учасники", "type": "participants", "required": True},
+            ],
+        )
+        my_team = Team.objects.create(
+            name="Stable Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        Participant.objects.create(
+            team=my_team,
+            full_name="Old Member",
+            email="oldmember@example.com",
+        )
+
+        response = self.client.post(
+            reverse("register_team_for_tournament", args=[tournament.id]),
+            {
+                "team": my_team.id,
+                "field_participants": '[{"full_name":"New Member","email":"newmember@example.com"}]',
+            },
+        )
+
+        self.assertRedirects(response, reverse("participant_dashboard"))
+        self.assertTrue(my_team.participants.filter(email="oldmember@example.com").exists())
+        self.assertTrue(my_team.participants.filter(email="newmember@example.com").exists())
+
+    def test_registration_participants_field_respects_member_limits(self):
+        tournament = self.create_tournament(
+            min_team_members=3,
+            max_team_members=3,
+            registration_fields_config=[
+                {"key": "participants", "label": "Учасники", "type": "participants", "required": True},
+            ],
+        )
+        my_team = Team.objects.create(
+            name="Strict Roster Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+
+        response = self.client.post(
+            reverse("register_team_for_tournament", args=[tournament.id]),
+            {
+                "team": my_team.id,
+                "field_participants": '[{"full_name":"Іван","email":"ivan@example.com"}]',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Потрібно щонайменше: 3")
+        self.assertFalse(TournamentRegistration.objects.filter(tournament=tournament, team=my_team).exists())
+
+    def test_tasks_stay_locked_until_registration_is_approved(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(hours=1),
+            end_date=timezone.now() + timedelta(days=1),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        team = Team.objects.create(
+            name="Pending Access Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.PENDING,
+        )
+
+        response = self.client.get(reverse("participant_dashboard"))
+
+        self.assertContains(response, "Завдання відкриються після схвалення заявки")
+        self.assertContains(response, "Очікує")
+
+    def test_outsider_cannot_open_tournament_leaderboard(self):
+        outsider = User.objects.create_user(
+            username="outsider",
+            password="secret123",
+            role="participant",
+            is_approved=True,
+            email="outsider@example.com",
+        )
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(hours=1),
+            end_date=timezone.now() + timedelta(days=1),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        self.client.force_login(outsider)
+
+        response = self.client.get(reverse("tournament_leaderboard", args=[tournament.id]))
+
+        self.assertRedirects(response, reverse("participant_dashboard"))
+
+    def test_rejected_registration_does_not_block_retry(self):
+        tournament = self.create_tournament()
+        my_team = Team.objects.create(
+            name="Retry Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=my_team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.REJECTED,
+        )
+
+        response = self.client.get(
+            reverse("register_team_for_tournament", args=[tournament.id]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Retry Team")
+
+    def test_rejected_registration_still_shows_retry_button_on_dashboard(self):
+        tournament = self.create_tournament()
+        my_team = Team.objects.create(
+            name="Retry Dashboard Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=my_team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.REJECTED,
+        )
+
+        response = self.client.get(reverse("participant_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Подати знову")
+        self.assertContains(response, reverse("register_team_for_tournament", args=[tournament.id]))
 
     def test_submit_solution_requires_approved_registration(self):
         tournament = self.create_tournament(
@@ -223,6 +539,39 @@ class TournamentPlatformViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_superuser_sees_inline_participant_form_on_team_page(self):
+        team = Team.objects.create(
+            name="Team Inline",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("team_detail", args=[team.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("add_participant", args=[team.id]))
+
+    def test_admin_can_create_user_from_dashboard(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_user_by_admin"),
+            {
+                "username": "manualjury",
+                "email": "manualjury@example.com",
+                "role": "jury",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_dashboard"))
+        created_user = User.objects.get(username="manualjury")
+        self.assertEqual(created_user.role, "jury")
+        self.assertFalse(created_user.is_approved)
+
     def test_admin_can_open_contextual_create_task_page(self):
         tournament = self.create_tournament()
         self.client.force_login(self.admin_user)
@@ -231,6 +580,161 @@ class TournamentPlatformViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, tournament.name)
+
+    def test_edit_tournament_page_has_add_task_button(self):
+        tournament = self.create_tournament()
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("edit_tournament", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("create_tournament_task", args=[tournament.id]))
+
+    def test_edit_tournament_page_shows_existing_tasks(self):
+        tournament = self.create_tournament()
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Shown task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("edit_tournament", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, task.title)
+        self.assertContains(response, reverse("edit_task", args=[task.id]))
+
+    def test_create_task_returns_to_edit_tournament(self):
+        tournament = self.create_tournament()
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_tournament_task", args=[tournament.id]),
+            {
+                "tournament": tournament.id,
+                "title": "Context task",
+                "description": "desc",
+                "requirements": "req",
+                "must_have": "must",
+                "official_solution": "solution",
+            },
+        )
+
+        self.assertRedirects(response, reverse("edit_tournament", args=[tournament.id]))
+
+    def test_edit_task_page_back_link_points_to_edit_tournament(self):
+        tournament = self.create_tournament()
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Back task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("edit_task", args=[task.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("edit_tournament", args=[tournament.id]))
+
+    def test_admin_can_create_draft_tournament_without_dates(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_tournament"),
+            {
+                "name": "",
+                "description": "",
+                "start_date": "",
+                "end_date": "",
+                "registration_start": "",
+                "registration_end": "",
+                "max_teams": "",
+                "is_draft": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_dashboard"))
+        tournament = Tournament.objects.latest("id")
+        self.assertTrue(tournament.is_draft)
+        self.assertIsNone(tournament.start_date)
+        self.assertIsNone(tournament.end_date)
+
+    def test_admin_can_create_draft_tournament_with_registration_fields(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_tournament"),
+            {
+                "name": "",
+                "description": "",
+                "registration_form_description": "",
+                "registration_fields_definition": "participants|Учасники|participants|required\nschool|Школа|text|optional",
+                "start_date": "",
+                "end_date": "",
+                "registration_start": "",
+                "registration_end": "",
+                "min_team_members": "2",
+                "max_team_members": "4",
+                "max_teams": "",
+                "is_draft": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_dashboard"))
+        tournament = Tournament.objects.latest("id")
+        self.assertTrue(tournament.is_draft)
+        self.assertEqual(
+            tournament.registration_fields_config,
+            [
+                {"key": "participants", "label": "Учасники", "type": "participants", "required": True},
+                {"key": "school", "label": "Школа", "type": "text", "required": False},
+            ],
+        )
+
+    def test_admin_can_edit_draft_tournament_without_dates(self):
+        tournament = Tournament.objects.create(
+            name="Draft Tournament",
+            description="",
+            is_draft=True,
+            created_by=self.admin_user,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("edit_tournament", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Draft Tournament")
+
+    def test_admin_can_create_draft_task_without_required_fields(self):
+        tournament = self.create_tournament()
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_tournament_task", args=[tournament.id]),
+            {
+                "tournament": tournament.id,
+                "title": "",
+                "description": "",
+                "requirements": "",
+                "must_have": "",
+                "official_solution": "",
+                "is_draft": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("edit_tournament", args=[tournament.id]))
+        task = Task.objects.latest("id")
+        self.assertTrue(task.is_draft)
+        self.assertEqual(task.title, "")
 
     def test_admin_can_approve_registration(self):
         tournament = self.create_tournament()
@@ -248,11 +752,47 @@ class TournamentPlatformViewTests(TestCase):
         )
         self.client.force_login(self.admin_user)
 
-        response = self.client.get(reverse("approve_registration", args=[registration.id]))
+        response = self.client.post(reverse("approve_registration", args=[registration.id]))
 
         self.assertRedirects(response, reverse("admin_dashboard"))
         registration.refresh_from_db()
         self.assertEqual(registration.status, TournamentRegistration.Status.APPROVED)
+
+    def test_admin_approval_requires_post(self):
+        pending_user = User.objects.create_user(
+            username="pending_jury",
+            password="secret123",
+            role="jury",
+            is_approved=False,
+            email="pending-jury@example.com",
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("approve_user", args=[pending_user.id]))
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_admin_registration_decision_requires_post(self):
+        tournament = self.create_tournament()
+        team = Team.objects.create(
+            name="Pending Approval Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        registration = TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.PENDING,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("approve_registration", args=[registration.id]))
+
+        self.assertEqual(response.status_code, 405)
+        registration.refresh_from_db()
+        self.assertEqual(registration.status, TournamentRegistration.Status.PENDING)
 
     def test_admin_can_change_user_role(self):
         jury_candidate = User.objects.create_user(
@@ -315,9 +855,10 @@ class TournamentPlatformViewTests(TestCase):
         self.assertRedirects(response, reverse("admin_dashboard"))
         self.assertFalse(Task.objects.filter(id=task.id).exists())
 
-    def test_admin_cannot_edit_started_tournament(self):
+    def test_admin_cannot_edit_tournament_after_registration_ends(self):
         tournament = self.create_tournament(
-            start_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(hours=1),
+            start_date=timezone.now() + timedelta(hours=1),
             end_date=timezone.now() + timedelta(hours=3),
         )
         self.client.force_login(self.admin_user)
@@ -325,6 +866,24 @@ class TournamentPlatformViewTests(TestCase):
         response = self.client.get(reverse("edit_tournament", args=[tournament.id]))
 
         self.assertRedirects(response, reverse("admin_dashboard"))
+
+    def test_edit_tournament_prefills_datetime_fields(self):
+        tournament = self.create_tournament()
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("edit_tournament", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            tournament.start_date.astimezone().strftime("%Y-%m-%dT%H:%M"),
+            html=False,
+        )
+        self.assertContains(
+            response,
+            tournament.end_date.astimezone().strftime("%Y-%m-%dT%H:%M"),
+            html=False,
+        )
 
     def test_captain_sees_published_tournament_before_registration_starts(self):
         tournament = self.create_tournament(
@@ -342,9 +901,94 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(tournaments[0]["tournament"].id, tournament.id)
         self.assertFalse(tournaments[0]["can_register"])
 
-    def test_admin_cannot_create_task_for_started_tournament(self):
+    def test_draft_tournament_is_hidden_from_participant_until_published(self):
+        Tournament.objects.create(
+            name="Hidden Draft",
+            description="Draft",
+            registration_start=timezone.now() - timedelta(days=1),
+            registration_end=timezone.now() + timedelta(days=1),
+            start_date=timezone.now() + timedelta(days=2),
+            end_date=timezone.now() + timedelta(days=3),
+            is_draft=True,
+            created_by=self.admin_user,
+        )
+
+        response = self.client.get(reverse("participant_dashboard"))
+
+        tournaments = response.context["tournaments_with_state"]
+        self.assertEqual(len(tournaments), 0)
+
+    def test_finished_tournament_stays_visible_for_approved_team(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(days=2),
+            end_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(days=3),
+        )
+        team = Team.objects.create(
+            name="Archive Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+
+        response = self.client.get(reverse("participant_dashboard"))
+
+        tournaments = response.context["tournaments_with_state"]
+        self.assertEqual(len(tournaments), 1)
+        self.assertTrue(tournaments[0]["can_open_tasks"])
+
+    def test_official_solution_is_visible_only_after_tournament_finish(self):
         tournament = self.create_tournament(
             start_date=timezone.now() - timedelta(hours=1),
+            end_date=timezone.now() + timedelta(hours=2),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Solution task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            official_solution="Official walkthrough",
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        team = Team.objects.create(
+            name="Approved Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+
+        response = self.client.get(reverse("tournament_tasks", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, task.official_solution)
+
+        tournament.end_date = timezone.now() - timedelta(minutes=1)
+        tournament.save(update_fields=["end_date"])
+
+        response = self.client.get(reverse("tournament_tasks", args=[tournament.id]))
+
+        self.assertContains(response, task.official_solution)
+        self.assertNotContains(response, reverse("submit_solution", args=[task.id]))
+
+    def test_admin_cannot_create_task_after_registration_ends(self):
+        tournament = self.create_tournament(
+            registration_end=timezone.now() - timedelta(hours=1),
+            start_date=timezone.now() + timedelta(hours=1),
             end_date=timezone.now() + timedelta(hours=3),
         )
         self.client.force_login(self.admin_user)
@@ -353,9 +997,10 @@ class TournamentPlatformViewTests(TestCase):
 
         self.assertRedirects(response, reverse("admin_dashboard"))
 
-    def test_admin_cannot_edit_task_after_tournament_start(self):
+    def test_admin_cannot_edit_task_after_registration_ends(self):
         tournament = self.create_tournament(
-            start_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(hours=1),
+            start_date=timezone.now() + timedelta(hours=1),
             end_date=timezone.now() + timedelta(hours=3),
         )
         task = Task.objects.create(

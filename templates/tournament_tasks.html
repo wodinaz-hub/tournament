@@ -26,6 +26,7 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
 .leader-meta{color:#64748b;font-size:13px;line-height:1.5;}
 .score{font-size:24px;font-weight:700;color:#0f766e;text-align:right;}
 .highlight{background:#fff9db;border:1px solid #f5df8f;padding:12px;border-radius:14px;margin-bottom:14px;}
+.solution-box{margin-top:16px;padding:14px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;}
 @media (max-width: 920px){.hero,.grid{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -65,15 +66,33 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
         <h2 style="margin-top:0;">Завдання турніру</h2>
         {% for task in tasks %}
             <div class="item">
-                <span class="pill">Доступно протягом усього турніру</span>
+                <span class="pill">
+                    {% if show_official_solutions %}
+                        Турнір завершено
+                    {% else %}
+                        Доступно протягом усього турніру
+                    {% endif %}
+                </span>
                 <h3 style="margin:0 0 10px;">{{ task.title }}</h3>
                 <p class="muted">{{ task.description }}</p>
                 <p><strong>Вимоги:</strong><br>{{ task.requirements }}</p>
                 <p><strong>Обов'язково має бути:</strong><br>{{ task.must_have }}</p>
-                <a class="btn" href="/task/{{ task.id }}/submit/">Відправити рішення</a>
+
+                {% if show_official_solutions and task.official_solution %}
+                    <div class="solution-box">
+                        <strong>Офіційна відповідь / розбір</strong>
+                        <p style="margin:10px 0 0;white-space:pre-line;">{{ task.official_solution }}</p>
+                    </div>
+                {% endif %}
+
+                {% if can_submit_solutions %}
+                    <a class="btn" href="/task/{{ task.id }}/submit/">Відправити рішення</a>
+                {% else %}
+                    <span class="back" style="margin-top:12px;">Подачу рішень закрито</span>
+                {% endif %}
             </div>
         {% empty %}
-            <p class="muted">Немає завдань.</p>
+            <p class="muted">Поки немає завдань.</p>
         {% endfor %}
     </div>
 

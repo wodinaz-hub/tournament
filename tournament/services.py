@@ -31,6 +31,7 @@ class TeamRegistrationService:
         telegram = (team_data.get("telegram") or None) or None
         participants_data = team_data.get("participants") or []
         registered_by = team_data.get("registered_by")
+        captain_user = team_data.get("captain_user") or registered_by
 
         if not name:
             raise ValidationError("Team name is required.")
@@ -40,12 +41,30 @@ class TeamRegistrationService:
             raise ValidationError("Captain email is required.")
         if registered_by is None:
             raise ValidationError("registered_by is required.")
+        if captain_user is None:
+            raise ValidationError("captain_user is required.")
         if len(participants_data) < 2:
             raise ValidationError("At least two participants are required.")
+        if (
+            tournament.max_teams
+            and TournamentRegistration.objects.filter(
+                tournament_id=tournament.id,
+                status__in=[
+                    TournamentRegistration.Status.PENDING,
+                    TournamentRegistration.Status.APPROVED,
+                ],
+            ).count()
+            >= tournament.max_teams
+        ):
+            raise ValidationError("Tournament team limit has been reached.")
 
         captain_exists = TournamentRegistration.objects.filter(
             tournament_id=tournament.id,
             team__captain_email__iexact=captain_email_raw.lower(),
+            status__in=[
+                TournamentRegistration.Status.PENDING,
+                TournamentRegistration.Status.APPROVED,
+            ],
         ).exists()
         if captain_exists:
             raise ValidationError(
@@ -66,6 +85,7 @@ class TeamRegistrationService:
             raise ValidationError("Participant emails must be unique within the team.")
 
         team = Team.objects.create(
+            captain_user=captain_user,
             name=name,
             captain_name=captain_name,
             captain_email=captain_email_raw,

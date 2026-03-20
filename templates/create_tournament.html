@@ -5,70 +5,486 @@
     <title>{% if mode == 'edit' %}Редагувати турнір{% else %}Створити турнір{% endif %}</title>
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; min-height: 100vh; padding: 30px 20px; }
-        .wrap { max-width: 760px; margin: 0 auto; }
-        .card { background: white; padding: 28px; border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
-        h1 { margin-top: 0; margin-bottom: 20px; }
-        label { display: block; margin-bottom: 6px; font-weight: 600; }
-        .form-input, input, textarea, select { width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid #d0d7e2; border-radius: 10px; font-size: 15px; background: white; }
-        .checkbox-row { display: flex; gap: 10px; align-items: center; margin: 8px 0 16px; }
-        .checkbox-row input { width: auto; margin: 0; }
-        button { border: none; background: #16a34a; color: white; padding: 12px 16px; border-radius: 10px; font-size: 15px; cursor: pointer; }
-        .back { display: inline-block; margin-left: 10px; text-decoration: none; color: #2563eb; }
-        .field-errors { color: #b00020; font-size: 14px; margin: -6px 0 10px; }
-        .error-box { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; margin-bottom: 16px; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(180deg, #eef4ff 0%, #f7f9fc 100%);
+            min-height: 100vh;
+            padding: 30px 20px;
+            color: #172033;
+        }
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+        .page-card {
+            background: white;
+            border: 1px solid #dbe3ee;
+            border-radius: 20px;
+            box-shadow: 0 14px 32px rgba(17, 24, 39, 0.08);
+            padding: 28px;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 22px;
+        }
+        .page-header h1 {
+            margin: 0 0 6px;
+            font-size: 32px;
+        }
+        .page-subtitle {
+            color: #64748b;
+            line-height: 1.6;
+        }
+        .back-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .error-box {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px 14px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+        }
+        .form-grid {
+            display: grid;
+            gap: 18px;
+        }
+        .section-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #fbfdff;
+            padding: 20px;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .section-title {
+            margin: 0;
+            font-size: 21px;
+        }
+        .section-note {
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0 0 14px;
+        }
+        .fields-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px 16px;
+        }
+        .field-span-2 {
+            grid-column: 1 / -1;
+        }
+        .field-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .form-input,
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #d0d7e2;
+            border-radius: 12px;
+            font-size: 15px;
+            background: white;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        .field-errors {
+            color: #b00020;
+            font-size: 14px;
+            margin-top: 6px;
+        }
+        .checkbox-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            min-height: 48px;
+        }
+        .checkbox-row input {
+            width: auto;
+            margin: 0;
+        }
+        .builder {
+            border: 1px solid #dbe3ee;
+            background: #f8fbff;
+            border-radius: 16px;
+            padding: 16px;
+        }
+        .builder-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .btn,
+        .btn-secondary,
+        .btn-danger,
+        .task-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            border-radius: 10px;
+            padding: 10px 14px;
+            min-height: 40px;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+        .btn {
+            background: #16a34a;
+            color: white;
+        }
+        .btn-secondary,
+        .task-link {
+            background: #2563eb;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        .btn-ghost {
+            background: #0f766e;
+            color: white;
+        }
+        .field-builder-row {
+            border: 1px solid #dbe3ee;
+            background: white;
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 12px;
+        }
+        .builder-grid {
+            display: grid;
+            grid-template-columns: 1.8fr 1fr auto auto;
+            gap: 10px;
+            align-items: center;
+        }
+        .builder-grid input,
+        .builder-grid select {
+            margin: 0;
+        }
+        .builder-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .builder-check input {
+            width: auto;
+            margin: 0;
+        }
+        .empty {
+            color: #64748b;
+        }
+        .hidden-source {
+            display: none;
+        }
+        .task-list {
+            display: grid;
+            gap: 12px;
+        }
+        .task-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 14px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            background: white;
+        }
+        .task-name {
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .task-meta {
+            color: #64748b;
+            font-size: 14px;
+        }
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .actions-bar {
+            display: flex;
+            justify-content: flex-start;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        @media (max-width: 820px) {
+            .fields-grid,
+            .builder-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="wrap">
-        <div class="card">
-            <h1>{% if mode == 'edit' %}Редагувати турнір{% else %}Створити турнір{% endif %}</h1>
+        <div class="page-card">
+            <div class="page-header">
+                <div>
+                    <h1>{% if mode == 'edit' %}Редагувати турнір{% else %}Створити турнір{% endif %}</h1>
+                    <div class="page-subtitle">Налаштуй основні параметри, анкету реєстрації та завдання турніру в одному місці.</div>
+                </div>
+                <a class="back-link" href="/admin-dashboard/">Назад до адмінки</a>
+            </div>
 
             {% if form.non_field_errors %}
                 <div class="error-box">{{ form.non_field_errors }}</div>
             {% endif %}
 
-            <form method="post">
+            <form method="post" id="tournament-form">
                 {% csrf_token %}
 
-                <label>Назва</label>
-                {{ form.name }}
-                {% if form.name.errors %}<div class="field-errors">{{ form.name.errors }}</div>{% endif %}
+                <div class="form-grid">
+                    <section class="section-card">
+                        <h2 class="section-title">Основне</h2>
+                        <div class="fields-grid" style="margin-top:14px;">
+                            <div class="field-group field-span-2">
+                                <label>Назва</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}<div class="field-errors">{{ form.name.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group field-span-2">
+                                <label>Опис</label>
+                                {{ form.description }}
+                                {% if form.description.errors %}<div class="field-errors">{{ form.description.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group field-span-2">
+                                <label>Опис форми реєстрації команди</label>
+                                {{ form.registration_form_description }}
+                                {% if form.registration_form_description.errors %}<div class="field-errors">{{ form.registration_form_description.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                    </section>
 
-                <label>Опис</label>
-                {{ form.description }}
-                {% if form.description.errors %}<div class="field-errors">{{ form.description.errors }}</div>{% endif %}
+                    <section class="section-card">
+                        <div class="section-header">
+                            <h2 class="section-title">Поля анкети</h2>
+                            <button type="button" class="btn btn-ghost" id="add-field">Додати поле</button>
+                        </div>
+                        <p class="section-note">Тут додаються додаткові поля, які капітан заповнює під час подачі заявки на турнір.</p>
+                        <div class="builder">
+                            <div id="registration-fields-builder"></div>
+                            <div id="builder-empty" class="empty">Поки що додаткових полів немає.</div>
+                        </div>
+                        <div class="hidden-source">
+                            {{ form.registration_fields_definition }}
+                        </div>
+                        {% if form.registration_fields_definition.errors %}<div class="field-errors">{{ form.registration_fields_definition.errors }}</div>{% endif %}
+                    </section>
 
-                <label>Дата початку</label>
-                {{ form.start_date }}
-                {% if form.start_date.errors %}<div class="field-errors">{{ form.start_date.errors }}</div>{% endif %}
+                    <section class="section-card">
+                        <h2 class="section-title">Дати та обмеження</h2>
+                        <div class="fields-grid" style="margin-top:14px;">
+                            <div class="field-group">
+                                <label>Дата початку</label>
+                                {{ form.start_date }}
+                                {% if form.start_date.errors %}<div class="field-errors">{{ form.start_date.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label>Дата завершення</label>
+                                {{ form.end_date }}
+                                {% if form.end_date.errors %}<div class="field-errors">{{ form.end_date.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label>Початок реєстрації</label>
+                                {{ form.registration_start }}
+                                {% if form.registration_start.errors %}<div class="field-errors">{{ form.registration_start.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label>Завершення реєстрації</label>
+                                {{ form.registration_end }}
+                                {% if form.registration_end.errors %}<div class="field-errors">{{ form.registration_end.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label>Мінімальна кількість людей у команді</label>
+                                {{ form.min_team_members }}
+                                {% if form.min_team_members.errors %}<div class="field-errors">{{ form.min_team_members.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label>Максимальна кількість людей у команді</label>
+                                {{ form.max_team_members }}
+                                {% if form.max_team_members.errors %}<div class="field-errors">{{ form.max_team_members.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label>Максимальна кількість команд</label>
+                                {{ form.max_teams }}
+                                {% if form.max_teams.errors %}<div class="field-errors">{{ form.max_teams.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label>Стан</label>
+                                <div class="checkbox-row">
+                                    {{ form.is_draft }}
+                                    <label for="{{ form.is_draft.id_for_label }}" style="margin:0;">Чернетка</label>
+                                </div>
+                                {% if form.is_draft.errors %}<div class="field-errors">{{ form.is_draft.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                    </section>
 
-                <label>Дата завершення</label>
-                {{ form.end_date }}
-                {% if form.end_date.errors %}<div class="field-errors">{{ form.end_date.errors }}</div>{% endif %}
+                    {% if mode == 'edit' and tournament %}
+                        <section class="section-card">
+                            <div class="section-header">
+                                <h2 class="section-title">Завдання турніру</h2>
+                                <a class="btn-secondary" href="{% url 'create_tournament_task' tournament.id %}">Додати завдання</a>
+                            </div>
+                            <div class="task-list">
+                                {% for task in tasks %}
+                                    <div class="task-row">
+                                        <div>
+                                            <div class="task-name">{{ task.title|default:"Без назви" }}</div>
+                                            <div class="task-meta">{% if task.is_draft %}Чернетка{% else %}Опубліковане завдання{% endif %}</div>
+                                        </div>
+                                        <div class="task-actions">
+                                            <a class="task-link" href="{% url 'edit_task' task.id %}">Редагувати</a>
+                                            <form method="post" action="{% url 'delete_task' task.id %}" style="margin:0;">
+                                                {% csrf_token %}
+                                                <button class="btn-danger" type="submit">Видалити</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <div class="empty">Поки що завдань немає.</div>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% endif %}
 
-                <label>Початок реєстрації</label>
-                {{ form.registration_start }}
-                {% if form.registration_start.errors %}<div class="field-errors">{{ form.registration_start.errors }}</div>{% endif %}
-
-                <label>Завершення реєстрації</label>
-                {{ form.registration_end }}
-                {% if form.registration_end.errors %}<div class="field-errors">{{ form.registration_end.errors }}</div>{% endif %}
-
-                <label>Максимальна кількість команд</label>
-                {{ form.max_teams }}
-                {% if form.max_teams.errors %}<div class="field-errors">{{ form.max_teams.errors }}</div>{% endif %}
-
-                <div class="checkbox-row">
-                    {{ form.is_draft }}
-                    <label for="{{ form.is_draft.id_for_label }}" style="margin:0;">Чернетка</label>
+                    <div class="actions-bar">
+                        <button type="submit" class="btn">{% if mode == 'edit' %}Зберегти{% else %}Створити{% endif %}</button>
+                        <a class="back-link" href="/admin-dashboard/">Назад</a>
+                    </div>
                 </div>
-                {% if form.is_draft.errors %}<div class="field-errors">{{ form.is_draft.errors }}</div>{% endif %}
-
-                <button type="submit">{% if mode == 'edit' %}Зберегти{% else %}Створити{% endif %}</button>
-                <a class="back" href="/admin-dashboard/">Назад</a>
             </form>
         </div>
     </div>
+
+    <template id="registration-field-template">
+        <div class="field-builder-row">
+            <div class="builder-grid">
+                <input type="text" class="builder-label" placeholder="Назва поля">
+                <select class="builder-type">
+                    <option value="text">Короткий текст</option>
+                    <option value="textarea">Великий текст</option>
+                    <option value="email">Email</option>
+                    <option value="number">Число</option>
+                    <option value="url">Посилання</option>
+                    <option value="participants">Учасники</option>
+                </select>
+                <label class="builder-check">
+                    <input type="checkbox" class="builder-required" checked>
+                    Обов'язкове
+                </label>
+                <button type="button" class="btn-danger builder-remove">Видалити</button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        (function () {
+            const hiddenField = document.getElementById("id_registration_fields_definition");
+            const builder = document.getElementById("registration-fields-builder");
+            const emptyState = document.getElementById("builder-empty");
+            const template = document.getElementById("registration-field-template");
+            const form = document.getElementById("tournament-form");
+
+            function updateEmptyState() {
+                emptyState.style.display = builder.children.length ? "none" : "block";
+            }
+
+            function syncHiddenField() {
+                const rows = builder.querySelectorAll(".field-builder-row");
+                const lines = Array.from(rows).map((row) => {
+                    const label = row.querySelector(".builder-label").value.trim();
+                    const type = row.querySelector(".builder-type").value;
+                    const required = row.querySelector(".builder-required").checked ? "required" : "optional";
+                    if (!label) {
+                        return "";
+                    }
+                    return `${label}|${label}|${type}|${required}`;
+                }).filter(Boolean);
+                hiddenField.value = lines.join("\n");
+                updateEmptyState();
+            }
+
+            function addRow(data = {}) {
+                const fragment = template.content.cloneNode(true);
+                const row = fragment.querySelector(".field-builder-row");
+                const labelInput = row.querySelector(".builder-label");
+                const typeSelect = row.querySelector(".builder-type");
+                const requiredInput = row.querySelector(".builder-required");
+                const removeButton = row.querySelector(".builder-remove");
+
+                labelInput.value = data.label || "";
+                typeSelect.value = data.type || "text";
+                requiredInput.checked = data.required !== false;
+
+                labelInput.addEventListener("input", syncHiddenField);
+                typeSelect.addEventListener("change", syncHiddenField);
+                requiredInput.addEventListener("change", syncHiddenField);
+                removeButton.addEventListener("click", () => {
+                    row.remove();
+                    syncHiddenField();
+                });
+
+                builder.appendChild(row);
+                syncHiddenField();
+            }
+
+            function parseExistingDefinition() {
+                const raw = hiddenField.value.trim();
+                if (!raw) {
+                    updateEmptyState();
+                    return;
+                }
+                raw.split("\n").forEach((line) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return;
+                    const [, label, type, requirement] = trimmed.split("|");
+                    addRow({
+                        label: label || "",
+                        type: type || "text",
+                        required: requirement !== "optional",
+                    });
+                });
+            }
+
+            document.getElementById("add-field").addEventListener("click", () => addRow({ type: "text", required: true }));
+            form.addEventListener("submit", syncHiddenField);
+            parseExistingDefinition();
+            updateEmptyState();
+        })();
+    </script>
 </body>
 </html>

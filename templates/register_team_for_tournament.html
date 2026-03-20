@@ -4,47 +4,32 @@
     <meta charset="UTF-8">
     <title>Реєстрація команди на турнір</title>
     <style>
-        body{
-            margin:0;
-            font-family:Arial,sans-serif;
-            background:#f4f6fb;
-            padding:30px 20px;
-        }
-        .wrap{
-            max-width:700px;
-            margin:0 auto;
-        }
-        .card{
-            background:white;
-            padding:24px;
-            border-radius:16px;
-            box-shadow:0 10px 24px rgba(0,0,0,.06);
-        }
-        label{
-            display:block;
-            margin-bottom:6px;
-            font-weight:600;
-        }
-        select,.form-input{
-            width:100%;
-            padding:10px 12px;
-            margin-bottom:12px;
-            border:1px solid #d0d7e2;
-            border-radius:10px;
-            box-sizing:border-box;
-        }
-        button{
-            border:none;
-            background:#2563eb;
-            color:white;
-            padding:10px 16px;
-            border-radius:10px;
-            cursor:pointer;
-        }
-        a{
-            margin-left:10px;
-            color:#2563eb;
-            text-decoration:none;
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; padding: 30px 20px; color: #1f2937; }
+        .wrap { max-width: 860px; margin: 0 auto; }
+        .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.06); }
+        .hint { background: #eef5ff; color: #244a7c; padding: 14px; border-radius: 12px; margin-bottom: 18px; line-height: 1.6; }
+        .meta { color: #475569; line-height: 1.7; margin-bottom: 18px; }
+        .section-title { margin: 22px 0 12px; font-size: 20px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; }
+        select, input, textarea, .form-input { width: 100%; padding: 10px 12px; margin-bottom: 12px; border: 1px solid #d0d7e2; border-radius: 10px; box-sizing: border-box; font-size: 15px; }
+        textarea { min-height: 120px; resize: vertical; }
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+        button { border: none; background: #2563eb; color: white; padding: 10px 16px; border-radius: 10px; cursor: pointer; }
+        .secondary-btn { background: #0f766e; }
+        .danger-btn { background: #dc2626; }
+        a { color: #2563eb; text-decoration: none; }
+        .field-errors { color: #b00020; font-size: 14px; margin: -6px 0 10px; }
+        .empty { color: #64748b; }
+        .field-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #fafcff; }
+        .required { color: #b91c1c; }
+        .participants-wrap { border: 1px solid #dbe7f3; background: #f8fbff; border-radius: 12px; padding: 14px; }
+        .participant-row { border: 1px solid #dbe3ee; background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+        .participant-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+        .participant-grid input { margin-bottom: 0; }
+        .participant-meta { color: #64748b; font-size: 14px; margin-bottom: 10px; }
+        .participant-summary { background: #ecfdf5; color: #166534; padding: 10px 12px; border-radius: 10px; margin-bottom: 10px; }
+        @media (max-width: 720px) {
+            .participant-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -53,15 +38,152 @@
         <div class="card">
             <h1>Реєстрація команди на турнір "{{ tournament.name }}"</h1>
 
-            <form method="post">
+            <div class="meta">
+                {% if tournament.min_team_members or tournament.max_team_members %}
+                    Розмір команди:
+                    {% if tournament.min_team_members %}від {{ tournament.min_team_members }}{% else %}без мінімуму{% endif %}
+                    {% if tournament.max_team_members %} до {{ tournament.max_team_members }}{% else %} і більше{% endif %}
+                    людей разом із капітаном.
+                {% endif %}
+            </div>
+
+            {% if tournament.registration_form_description %}
+                <div class="hint">{{ tournament.registration_form_description|linebreaksbr }}</div>
+            {% endif %}
+
+            <form method="post" id="registration-form">
                 {% csrf_token %}
 
-                {{ form.as_p }}
+                <h2 class="section-title">Команда</h2>
+                <label for="{{ form.team.id_for_label }}">Оберіть команду</label>
+                {{ form.team }}
+                {% if form.team.errors %}<div class="field-errors">{{ form.team.errors }}</div>{% endif %}
 
-                <button type="submit">Зареєструвати команду</button>
-                <a href="/participant-dashboard/">Назад</a>
+                {% if tournament.registration_fields_config %}
+                    <h2 class="section-title">Анкета</h2>
+                    {% for field in form %}
+                        {% if field.name != "team" %}
+                            <div class="field-card">
+                                <label for="{{ field.id_for_label }}">
+                                    {{ field.label }}
+                                    {% if field.field.required %}<span class="required">*</span>{% endif %}
+                                </label>
+
+                                {% if field.field.widget.attrs.data_field_type == "participants" %}
+                                    {{ field }}
+                                    <div class="participants-wrap" data-target-id="{{ field.auto_id }}" data-min-members="{{ field.field.widget.attrs.data_min_members }}" data-max-members="{{ field.field.widget.attrs.data_max_members }}">
+                                        <div class="participant-summary">
+                                            Капітан уже входить до команди. Тут додай інших учасників.
+                                        </div>
+                                        <div class="participant-meta">
+                                            {% if tournament.min_team_members or tournament.max_team_members %}
+                                                Потрібно додати
+                                                {% if tournament.min_team_members %}щонайменше {{ tournament.min_team_members|add:"-1" }}{% else %}0{% endif %}
+                                                {% if tournament.max_team_members %} і не більше {{ tournament.max_team_members|add:"-1" }}{% else %} і більше{% endif %}
+                                                учасників без капітана.
+                                            {% endif %}
+                                        </div>
+                                        <div class="participants-list"></div>
+                                        <button type="button" class="secondary-btn add-participant-btn">Додати учасника</button>
+                                    </div>
+                                {% else %}
+                                    {{ field }}
+                                {% endif %}
+
+                                {% if field.errors %}<div class="field-errors">{{ field.errors }}</div>{% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+
+                {% if form.non_field_errors %}<div class="field-errors">{{ form.non_field_errors }}</div>{% endif %}
+
+                <div class="toolbar">
+                    <button type="submit">Надіслати заявку</button>
+                    <a href="/participant-dashboard/">Назад</a>
+                </div>
             </form>
+
+            {% if not tournament.registration_fields_config %}
+                <div class="empty" style="margin-top:18px;">Організатор ще не додав додаткових полів анкети. Зараз заявка містить лише вибір команди.</div>
+            {% endif %}
         </div>
     </div>
+
+    <template id="participant-row-template">
+        <div class="participant-row">
+            <div class="participant-grid">
+                <div>
+                    <label>Ім'я учасника</label>
+                    <input type="text" class="participant-name" placeholder="ПІБ">
+                </div>
+                <div>
+                    <label>Email учасника</label>
+                    <input type="email" class="participant-email" placeholder="name@example.com">
+                </div>
+                <div>
+                    <button type="button" class="danger-btn remove-participant-btn">Видалити</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        (function () {
+            const template = document.getElementById("participant-row-template");
+
+            function syncParticipants(container) {
+                const targetId = container.dataset.targetId;
+                const hiddenInput = document.getElementById(targetId);
+                const rows = container.querySelectorAll(".participant-row");
+                const payload = Array.from(rows).map((row) => ({
+                    full_name: row.querySelector(".participant-name").value.trim(),
+                    email: row.querySelector(".participant-email").value.trim(),
+                })).filter((item) => item.full_name || item.email);
+                hiddenInput.value = JSON.stringify(payload);
+            }
+
+            function addParticipantRow(container, data = {}) {
+                const fragment = template.content.cloneNode(true);
+                const row = fragment.querySelector(".participant-row");
+                const nameInput = row.querySelector(".participant-name");
+                const emailInput = row.querySelector(".participant-email");
+                const removeButton = row.querySelector(".remove-participant-btn");
+
+                nameInput.value = data.full_name || "";
+                emailInput.value = data.email || "";
+
+                nameInput.addEventListener("input", () => syncParticipants(container));
+                emailInput.addEventListener("input", () => syncParticipants(container));
+                removeButton.addEventListener("click", () => {
+                    row.remove();
+                    syncParticipants(container);
+                });
+
+                container.querySelector(".participants-list").appendChild(row);
+                syncParticipants(container);
+            }
+
+            document.querySelectorAll(".participants-wrap").forEach((container) => {
+                const hiddenInput = document.getElementById(container.dataset.targetId);
+                const addButton = container.querySelector(".add-participant-btn");
+                let initialPayload = [];
+
+                try {
+                    initialPayload = hiddenInput.value ? JSON.parse(hiddenInput.value) : [];
+                } catch (error) {
+                    initialPayload = [];
+                }
+
+                if (initialPayload.length) {
+                    initialPayload.forEach((item) => addParticipantRow(container, item));
+                } else {
+                    addParticipantRow(container);
+                }
+
+                addButton.addEventListener("click", () => addParticipantRow(container));
+            });
+        })();
+    </script>
 </body>
 </html>

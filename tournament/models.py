@@ -7,14 +7,34 @@ from django.utils import timezone
 class Tournament(models.Model):
     name = models.CharField(max_length=255, verbose_name="Назва")
     description = models.TextField(verbose_name="Опис")
-    start_date = models.DateTimeField(verbose_name="Дата початку")
-    end_date = models.DateTimeField(verbose_name="Дата завершення")
-    registration_start = models.DateTimeField(verbose_name="Початок реєстрації")
-    registration_end = models.DateTimeField(verbose_name="Завершення реєстрації")
+    registration_form_description = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Опис форми реєстрації команди",
+    )
+    registration_fields_config = models.JSONField(
+        blank=True,
+        default=list,
+        verbose_name="Поля форми реєстрації",
+    )
+    start_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата початку")
+    end_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата завершення")
+    registration_start = models.DateTimeField(null=True, blank=True, verbose_name="Початок реєстрації")
+    registration_end = models.DateTimeField(null=True, blank=True, verbose_name="Завершення реєстрації")
     max_teams = models.PositiveIntegerField(
         null=True,
         blank=True,
         verbose_name="Максимальна кількість команд",
+    )
+    min_team_members = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Мінімальна кількість людей у команді",
+    )
+    max_team_members = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Максимальна кількість людей у команді",
     )
     is_draft = models.BooleanField(default=True, verbose_name="Чернетка")
     created_by = models.ForeignKey(
@@ -37,9 +57,15 @@ class Tournament(models.Model):
         now = timezone.now()
         if self.is_draft:
             return "draft"
+        if not self.start_date or not self.end_date:
+            return "scheduled"
         if now > self.end_date:
             return "finished"
-        if self.registration_start <= now <= self.registration_end:
+        if (
+            self.registration_start
+            and self.registration_end
+            and self.registration_start <= now <= self.registration_end
+        ):
             return "registration"
         if self.start_date <= now <= self.end_date:
             return "running"
@@ -61,17 +87,24 @@ class Tournament(models.Model):
         now = timezone.now()
         return (
             not self.is_draft
+            and self.registration_start is not None
+            and self.registration_end is not None
             and self.registration_start <= now <= self.registration_end
         )
 
     @property
     def is_running(self):
         now = timezone.now()
-        return not self.is_draft and self.start_date <= now <= self.end_date
+        return (
+            not self.is_draft
+            and self.start_date is not None
+            and self.end_date is not None
+            and self.start_date <= now <= self.end_date
+        )
 
     @property
     def is_finished(self):
-        return timezone.now() > self.end_date
+        return self.end_date is not None and timezone.now() > self.end_date
 
 
 class Team(models.Model):
@@ -106,6 +139,10 @@ class Team(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def members_count(self):
+        return 1 + self.participants.count()
+
 
 class TournamentRegistration(models.Model):
     class Status(models.TextChoices):
@@ -136,6 +173,11 @@ class TournamentRegistration(models.Model):
         choices=Status.choices,
         default=Status.PENDING,
         verbose_name="Статус заявки",
+    )
+    form_answers = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="Відповіді на поля форми",
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата реєстрації")
 
@@ -184,6 +226,11 @@ class Task(models.Model):
     description = models.TextField(verbose_name="Опис")
     requirements = models.TextField(verbose_name="Вимоги")
     must_have = models.TextField(verbose_name="Обов'язково має бути")
+    official_solution = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Офіційна відповідь / розбір",
+    )
     is_draft = models.BooleanField(default=True, verbose_name="Чернетка")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

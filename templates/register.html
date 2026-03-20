@@ -4,10 +4,7 @@
     <meta charset="UTF-8">
     <title>Реєстрація</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -18,34 +15,39 @@
             justify-content: center;
             padding: 20px;
         }
-
         .card {
             width: 100%;
-            max-width: 460px;
+            max-width: 480px;
             background: white;
             padding: 32px;
-            border-radius: 16px;
+            border-radius: 18px;
             box-shadow: 0 12px 30px rgba(0,0,0,0.08);
         }
-
         h1 {
             margin: 0 0 8px;
-            font-size: 28px;
+            font-size: 30px;
             text-align: center;
         }
-
         .sub {
             text-align: center;
-            color: #666;
+            color: #64748b;
             margin-bottom: 24px;
+            line-height: 1.6;
         }
-
+        .hint {
+            background: #eef5ff;
+            color: #244a7c;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
         label {
             display: block;
             margin-bottom: 6px;
             font-weight: 600;
         }
-
         input, select {
             width: 100%;
             padding: 12px 14px;
@@ -55,7 +57,6 @@
             font-size: 15px;
             background: white;
         }
-
         button {
             width: 100%;
             border: none;
@@ -67,30 +68,6 @@
             cursor: pointer;
             margin-top: 8px;
         }
-
-        button:hover {
-            background: #15803d;
-        }
-
-        .hint {
-            background: #eef5ff;
-            color: #244a7c;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 18px;
-            font-size: 14px;
-        }
-
-        .bottom {
-            text-align: center;
-            margin-top: 18px;
-        }
-
-        .bottom a {
-            color: #2563eb;
-            text-decoration: none;
-        }
-
         .error-box {
             background: #fee2e2;
             color: #991b1b;
@@ -98,13 +75,11 @@
             border-radius: 10px;
             margin-bottom: 16px;
         }
-
         .field-errors {
             color: #b00020;
             font-size: 14px;
             margin: -4px 0 10px;
         }
-
         .helptext {
             display: block;
             color: #666;
@@ -112,7 +87,14 @@
             margin-top: -4px;
             margin-bottom: 10px;
         }
-
+        .bottom {
+            text-align: center;
+            margin-top: 18px;
+        }
+        .bottom a {
+            color: #2563eb;
+            text-decoration: none;
+        }
         ul {
             margin: 6px 0;
             padding-left: 20px;
@@ -122,16 +104,14 @@
 <body>
     <div class="card">
         <h1>Реєстрація</h1>
-        <div class="sub">Створіть новий акаунт</div>
+        <div class="sub">Створіть новий акаунт і виберіть роль одразу під час реєстрації.</div>
 
         <div class="hint">
-            Учасник активується одразу. Ролі журі та адміністратора потребують схвалення іншим адміністратором.
+            Учасник активується одразу. Капітан, журі та адміністратор потребують схвалення адміністратором.
         </div>
 
         {% if form.non_field_errors %}
-            <div class="error-box">
-                {{ form.non_field_errors }}
-            </div>
+            <div class="error-box">{{ form.non_field_errors }}</div>
         {% endif %}
 
         <form method="post">
@@ -139,36 +119,24 @@
 
             <label for="{{ form.username.id_for_label }}">Логін</label>
             {{ form.username }}
-            {% if form.username.errors %}
-                <div class="field-errors">{{ form.username.errors }}</div>
-            {% endif %}
+            {% if form.username.errors %}<div class="field-errors">{{ form.username.errors }}</div>{% endif %}
 
             <label for="{{ form.email.id_for_label }}">Email</label>
             {{ form.email }}
-            {% if form.email.errors %}
-                <div class="field-errors">{{ form.email.errors }}</div>
-            {% endif %}
+            {% if form.email.errors %}<div class="field-errors">{{ form.email.errors }}</div>{% endif %}
 
             <label for="{{ form.role.id_for_label }}">Роль</label>
             {{ form.role }}
-            {% if form.role.errors %}
-                <div class="field-errors">{{ form.role.errors }}</div>
-            {% endif %}
+            {% if form.role.errors %}<div class="field-errors">{{ form.role.errors }}</div>{% endif %}
 
             <label for="{{ form.password1.id_for_label }}">Пароль</label>
             {{ form.password1 }}
-            {% if form.password1.help_text %}
-                <div class="helptext">{{ form.password1.help_text|safe }}</div>
-            {% endif %}
-            {% if form.password1.errors %}
-                <div class="field-errors">{{ form.password1.errors }}</div>
-            {% endif %}
+            {% if form.password1.help_text %}<div class="helptext">{{ form.password1.help_text|safe }}</div>{% endif %}
+            {% if form.password1.errors %}<div class="field-errors">{{ form.password1.errors }}</div>{% endif %}
 
             <label for="{{ form.password2.id_for_label }}">Підтвердження пароля</label>
             {{ form.password2 }}
-            {% if form.password2.errors %}
-                <div class="field-errors">{{ form.password2.errors }}</div>
-            {% endif %}
+            {% if form.password2.errors %}<div class="field-errors">{{ form.password2.errors }}</div>{% endif %}
 
             <button type="submit">Зареєструватися</button>
         </form>

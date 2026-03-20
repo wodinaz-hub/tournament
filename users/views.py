@@ -3,7 +3,9 @@ from statistics import mean
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.http import HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from tournament.forms import (
@@ -26,7 +28,7 @@ from tournament.models import (
     TournamentRegistration,
 )
 
-from .forms import LoginForm, RegisterForm
+from .forms import AdminCreateUserForm, LoginForm, RegisterForm
 from .models import CustomUser
 
 
@@ -103,6 +105,87 @@ def build_tournament_leaderboard(tournament):
     return leaderboard
 
 
+def is_tournament_edit_locked(tournament):
+    return (
+        not tournament.is_draft
+        and tournament.registration_end is not None
+        and tournament.registration_end <= timezone.now()
+    )
+
+
+def registration_participant_emails(registration):
+    emails = set()
+    for value in registration.form_answers.values():
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            email = (item.get('email') or '').strip().lower()
+            if email:
+                emails.add(email)
+    return emails
+
+
+def user_has_registration_access(user, registration):
+    user_email = (user.email or '').strip().lower()
+    return (
+        registration.team.captain_user_id == user.id
+        or registration.team.participants.filter(email=user.email).exists()
+        or user_email in registration_participant_emails(registration)
+    )
+
+
+def build_admin_dashboard_context(admin_create_user_form=None):
+    all_users = CustomUser.objects.order_by('role', 'username')
+    pending_users = CustomUser.objects.filter(is_approved=False).exclude(role='participant')
+    approved_users = CustomUser.objects.filter(is_approved=True)
+    tournaments = Tournament.objects.prefetch_related('tasks').all()
+    active_tournaments = [tournament for tournament in tournaments if not tournament.is_finished]
+    inactive_tournaments = [tournament for tournament in tournaments if tournament.is_finished]
+    teams = Team.objects.select_related('captain_user').prefetch_related('registrations__tournament')
+    submissions = Submission.objects.select_related('team', 'task', 'task__tournament').all()
+    jury_assignments = JuryAssignment.objects.select_related('jury_user', 'submission').all()
+    evaluations = Evaluation.objects.select_related('assignment').all()
+    registrations = TournamentRegistration.objects.select_related('tournament', 'team', 'registered_by').all()
+    for registration in registrations:
+        fields_by_key = {
+            field['key']: field.get('label', field['key'])
+            for field in registration.tournament.registration_fields_config
+        }
+        registration.display_form_answers = [
+            {
+                'label': fields_by_key.get(key, key),
+                'value': (
+                    ', '.join(
+                        f"{item.get('full_name', '-') } ({item.get('email', '-')})"
+                        for item in value
+                    )
+                    if isinstance(value, list)
+                    else value
+                ),
+            }
+            for key, value in registration.form_answers.items()
+        ]
+
+    return {
+        'all_users': all_users,
+        'admin_create_user_form': admin_create_user_form or AdminCreateUserForm(),
+        'role_choices': CustomUser.ROLE_CHOICES,
+        'now': timezone.now(),
+        'pending_users': pending_users,
+        'approved_users': approved_users,
+        'tournaments': tournaments,
+        'active_tournaments': active_tournaments,
+        'inactive_tournaments': inactive_tournaments,
+        'teams': teams,
+        'submissions': submissions,
+        'jury_assignments': jury_assignments,
+        'evaluations': evaluations,
+        'registrations': registrations,
+    }
+
+
 def home(request):
     if request.user.is_authenticated:
         return redirect('redirect_by_role')
@@ -167,41 +250,37 @@ def redirect_by_role(request):
 def admin_dashboard(request):
     if not (request.user.is_superuser or request.user.role == 'admin'):
         return redirect('redirect_by_role')
+    return render(request, 'admin_dashboard.html', build_admin_dashboard_context())
 
-    all_users = CustomUser.objects.order_by('role', 'username')
-    pending_users = CustomUser.objects.filter(is_approved=False).exclude(role='participant')
-    approved_users = CustomUser.objects.filter(is_approved=True)
-    tournaments = Tournament.objects.prefetch_related('tasks').all()
-    active_tournaments = [tournament for tournament in tournaments if not tournament.is_finished]
-    inactive_tournaments = [tournament for tournament in tournaments if tournament.is_finished]
-    teams = Team.objects.select_related('captain_user').prefetch_related('registrations__tournament')
-    submissions = Submission.objects.select_related('team', 'task', 'task__tournament').all()
-    jury_assignments = JuryAssignment.objects.select_related('jury_user', 'submission').all()
-    evaluations = Evaluation.objects.select_related('assignment').all()
-    registrations = TournamentRegistration.objects.select_related('tournament', 'team', 'registered_by').all()
 
-    context = {
-        'all_users': all_users,
-        'role_choices': CustomUser.ROLE_CHOICES,
-        'now': timezone.now(),
-        'pending_users': pending_users,
-        'approved_users': approved_users,
-        'tournaments': tournaments,
-        'active_tournaments': active_tournaments,
-        'inactive_tournaments': inactive_tournaments,
-        'teams': teams,
-        'submissions': submissions,
-        'jury_assignments': jury_assignments,
-        'evaluations': evaluations,
-        'registrations': registrations,
-    }
-    return render(request, 'admin_dashboard.html', context)
+@login_required
+def create_user_by_admin(request):
+    if not (request.user.is_superuser or request.user.role == 'admin'):
+        return redirect('redirect_by_role')
+    if request.method == 'GET':
+        return render(
+            request,
+            'create_user.html',
+            {'form': AdminCreateUserForm(), 'mode': 'create'},
+        )
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['GET', 'POST'])
+
+    form = AdminCreateUserForm(request.POST)
+    if form.is_valid():
+        user = form.save(commit=False)
+        user.is_approved = user.role == 'participant'
+        user.save()
+        return redirect('admin_dashboard')
+    return render(request, 'create_user.html', {'form': form, 'mode': 'create'})
 
 
 @login_required
 def approve_user(request, user_id):
     if not (request.user.is_superuser or request.user.role == 'admin'):
         return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
 
     user = get_object_or_404(CustomUser, id=user_id)
     if user.id == request.user.id and not request.user.is_superuser:
@@ -253,6 +332,8 @@ def delete_user(request, user_id):
 def approve_registration(request, registration_id):
     if not (request.user.is_superuser or request.user.role == 'admin'):
         return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
 
     registration = get_object_or_404(TournamentRegistration, id=registration_id)
     registration.status = TournamentRegistration.Status.APPROVED
@@ -264,6 +345,8 @@ def approve_registration(request, registration_id):
 def reject_registration(request, registration_id):
     if not (request.user.is_superuser or request.user.role == 'admin'):
         return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
 
     registration = get_object_or_404(TournamentRegistration, id=registration_id)
     registration.status = TournamentRegistration.Status.REJECTED
@@ -295,7 +378,7 @@ def edit_tournament(request, tournament_id):
         return redirect('redirect_by_role')
 
     tournament = get_object_or_404(Tournament, id=tournament_id)
-    if tournament.start_date <= timezone.now():
+    if is_tournament_edit_locked(tournament):
         return redirect('admin_dashboard')
 
     if request.method == 'POST':
@@ -310,6 +393,7 @@ def edit_tournament(request, tournament_id):
         'form': form,
         'mode': 'edit',
         'tournament': tournament,
+        'tasks': tournament.tasks.all(),
     })
 
 
@@ -333,7 +417,7 @@ def create_task(request, tournament_id=None):
     tournament = None
     if tournament_id is not None:
         tournament = get_object_or_404(Tournament, id=tournament_id)
-        if tournament.start_date <= timezone.now():
+        if is_tournament_edit_locked(tournament):
             return redirect('admin_dashboard')
 
     if request.method == 'POST':
@@ -342,7 +426,7 @@ def create_task(request, tournament_id=None):
             task = form.save(commit=False)
             task.created_by = request.user
             task.save()
-            return redirect('admin_dashboard')
+            return redirect('edit_tournament', tournament_id=task.tournament_id)
     else:
         form = TaskForm(tournament=tournament)
 
@@ -350,6 +434,10 @@ def create_task(request, tournament_id=None):
         'form': form,
         'mode': 'create',
         'tournament': tournament,
+        'back_url': (
+            reverse('edit_tournament', args=[tournament.id])
+            if tournament is not None else reverse('admin_dashboard')
+        ),
     })
 
 
@@ -359,14 +447,14 @@ def edit_task(request, task_id):
         return redirect('redirect_by_role')
 
     task = get_object_or_404(Task, id=task_id)
-    if task.tournament.start_date <= timezone.now():
+    if is_tournament_edit_locked(task.tournament):
         return redirect('admin_dashboard')
 
     if request.method == 'POST':
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
             form.save()
-            return redirect('admin_dashboard')
+            return redirect('edit_tournament', tournament_id=task.tournament_id)
     else:
         form = TaskForm(instance=task)
 
@@ -375,6 +463,7 @@ def edit_task(request, task_id):
         'mode': 'edit',
         'task': task,
         'tournament': task.tournament,
+        'back_url': reverse('edit_tournament', args=[task.tournament_id]),
     })
 
 
@@ -496,41 +585,60 @@ def participant_dashboard(request):
         'registrations__tournament',
     ).distinct()
 
-    visible_tournaments = [
-        tournament
-        for tournament in Tournament.objects.filter(is_draft=False).order_by('start_date')
-        if not tournament.is_finished
+    visible_tournaments = list(
+        Tournament.objects.filter(is_draft=False).order_by('-start_date')
+    )
+
+    registrations = TournamentRegistration.objects.select_related(
+        'tournament',
+        'team',
+        'team__captain_user',
+    ).prefetch_related('team__participants')
+    my_registrations = [
+        reg for reg in registrations
+        if user_has_registration_access(request.user, reg)
     ]
 
-    registrations = TournamentRegistration.objects.filter(
-        Q(team__captain_user=request.user) | Q(team__participants__email=request.user.email)
-    ).select_related('tournament', 'team').distinct()
-
-    my_registration_by_tournament_id = {
-        reg.tournament_id: reg for reg in registrations
-    }
+    my_registration_by_tournament_id = {}
+    for reg in my_registrations:
+        current = my_registration_by_tournament_id.get(reg.tournament_id)
+        if current is None:
+            my_registration_by_tournament_id[reg.tournament_id] = reg
+            continue
+        if current.status == TournamentRegistration.Status.REJECTED and reg.status != TournamentRegistration.Status.REJECTED:
+            my_registration_by_tournament_id[reg.tournament_id] = reg
 
     tournaments_with_state = []
     for tournament in visible_tournaments:
         existing_registration = my_registration_by_tournament_id.get(tournament.id)
+        active_registration = (
+            existing_registration
+            if existing_registration is not None
+            and existing_registration.status != TournamentRegistration.Status.REJECTED
+            else None
+        )
         can_register = (
             request.user.role == 'captain'
             and tournament.is_registration_open
-            and existing_registration is None
+            and active_registration is None
         )
         can_open_tasks = (
-            existing_registration is not None
-            and existing_registration.status == TournamentRegistration.Status.APPROVED
-            and tournament.is_running
+            active_registration is not None
+            and active_registration.status == TournamentRegistration.Status.APPROVED
+            and (tournament.is_running or tournament.is_finished)
         )
 
         tournaments_with_state.append({
             'tournament': tournament,
             'my_registration': existing_registration,
-            'my_team': existing_registration.team if existing_registration else None,
+            'my_team': active_registration.team if active_registration else None,
             'can_register': can_register,
             'can_open_tasks': can_open_tasks,
-            'can_view_leaderboard': tournament.start_date <= timezone.now(),
+            'can_view_leaderboard': (
+                active_registration is not None
+                and active_registration.status == TournamentRegistration.Status.APPROVED
+                and tournament.start_date <= timezone.now()
+            ),
         })
 
     return render(request, 'participant_dashboard.html', {
@@ -579,23 +687,75 @@ def register_team_for_tournament(request, tournament_id):
     already_registered = TournamentRegistration.objects.filter(
         tournament=tournament,
         team__captain_user=request.user,
+        status__in=[
+            TournamentRegistration.Status.PENDING,
+            TournamentRegistration.Status.APPROVED,
+        ],
     ).exists()
     if already_registered:
         return redirect('participant_dashboard')
 
-    if tournament.max_teams and TournamentRegistration.objects.filter(tournament=tournament).count() >= tournament.max_teams:
+    if (
+        tournament.max_teams
+        and TournamentRegistration.objects.filter(
+            tournament=tournament,
+            status__in=[
+                TournamentRegistration.Status.PENDING,
+                TournamentRegistration.Status.APPROVED,
+            ],
+        ).count()
+        >= tournament.max_teams
+    ):
         return redirect('participant_dashboard')
 
     if request.method == 'POST':
         form = TournamentRegistrationForm(request.POST, user=request.user, tournament=tournament)
         if form.is_valid():
-            TournamentRegistration.objects.create(
-                tournament=tournament,
-                team=form.cleaned_data['team'],
-                registered_by=request.user,
-                status=TournamentRegistration.Status.PENDING,
-            )
-            return redirect('participant_dashboard')
+            team = form.cleaned_data['team']
+            roster_participants = form.cleaned_participants()
+            members_count = 1 + len(roster_participants) if roster_participants is not None else team.members_count
+            if (
+                tournament.min_team_members is not None
+                and members_count < tournament.min_team_members
+            ):
+                form.add_error(
+                    'team',
+                    f'У команді замало людей. Потрібно щонайменше: {tournament.min_team_members}.',
+                )
+            elif (
+                tournament.max_team_members is not None
+                and members_count > tournament.max_team_members
+            ):
+                form.add_error(
+                    'team',
+                    f'У команді забагато людей. Максимум дозволено: {tournament.max_team_members}.',
+                )
+            else:
+                if roster_participants is not None:
+                    existing_participants = {
+                        participant.email.lower(): participant
+                        for participant in team.participants.all()
+                    }
+                    for item in roster_participants:
+                        email = item['email'].lower()
+                        participant = existing_participants.get(email)
+                        if participant is None:
+                            Participant.objects.create(
+                                team=team,
+                                full_name=item['full_name'],
+                                email=item['email'],
+                            )
+                        elif participant.full_name != item['full_name']:
+                            participant.full_name = item['full_name']
+                            participant.save(update_fields=['full_name'])
+                TournamentRegistration.objects.create(
+                    tournament=tournament,
+                    team=team,
+                    registered_by=request.user,
+                    status=TournamentRegistration.Status.PENDING,
+                    form_answers=form.cleaned_form_answers(),
+                )
+                return redirect('participant_dashboard')
     else:
         form = TournamentRegistrationForm(user=request.user, tournament=tournament)
 
@@ -617,6 +777,7 @@ def team_detail(request, team_id):
         'team': team,
         'participants_count': team.participants.count(),
         'submissions': submissions,
+        'participant_form': ParticipantForm(),
         'can_manage_team': request.user.is_superuser or team.captain_user_id == request.user.id,
         'can_leave_team': (
             not request.user.is_superuser
@@ -721,25 +882,24 @@ def leave_team(request, team_id):
 @login_required
 def tournament_tasks(request, tournament_id):
     tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
-    if not tournament.is_running:
+    if not (tournament.is_running or tournament.is_finished):
         return redirect('participant_dashboard')
 
-    has_access = TournamentRegistration.objects.filter(
+    approved_registrations = TournamentRegistration.objects.filter(
         tournament=tournament,
         status=TournamentRegistration.Status.APPROVED,
-    ).filter(
-        Q(team__captain_user=request.user) | Q(team__participants__email=request.user.email)
-    ).exists()
+    ).select_related('team', 'team__captain_user').prefetch_related('team__participants')
+    my_registration = next(
+        (registration for registration in approved_registrations if user_has_registration_access(request.user, registration)),
+        None,
+    )
+    has_access = my_registration is not None
     if not has_access and not request.user.is_superuser:
         return redirect('participant_dashboard')
 
     tasks = Task.objects.filter(tournament=tournament, is_draft=False)
     leaderboard = build_tournament_leaderboard(tournament)
-    my_team = Team.objects.filter(
-        Q(captain_user=request.user) | Q(participants__email=request.user.email),
-        registrations__tournament=tournament,
-        registrations__status=TournamentRegistration.Status.APPROVED,
-    ).distinct().first()
+    my_team = my_registration.team if my_registration is not None else None
     preview_rows = leaderboard[:5]
     return render(request, 'tournament_tasks.html', {
         'tournament': tournament,
@@ -747,18 +907,27 @@ def tournament_tasks(request, tournament_id):
         'leaderboard_preview': preview_rows,
         'leaderboard_total': len(leaderboard),
         'my_team': my_team,
+        'can_submit_solutions': tournament.is_running,
+        'show_official_solutions': tournament.is_finished,
     })
 
 
 @login_required
 def tournament_leaderboard(request, tournament_id):
     tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
+    approved_registrations = TournamentRegistration.objects.filter(
+        tournament=tournament,
+        status=TournamentRegistration.Status.APPROVED,
+    ).select_related('team', 'team__captain_user').prefetch_related('team__participants')
+    my_registration = next(
+        (registration for registration in approved_registrations if user_has_registration_access(request.user, registration)),
+        None,
+    )
+    if my_registration is None and not request.user.is_superuser:
+        return redirect('participant_dashboard')
+
     leaderboard = build_tournament_leaderboard(tournament)
-    my_team = Team.objects.filter(
-        Q(captain_user=request.user) | Q(participants__email=request.user.email),
-        registrations__tournament=tournament,
-        registrations__status=TournamentRegistration.Status.APPROVED,
-    ).distinct().first()
+    my_team = my_registration.team if my_registration is not None else None
 
     return render(request, 'tournament_leaderboard.html', {
         'tournament': tournament,
@@ -774,11 +943,15 @@ def submit_solution(request, task_id):
     if not tournament.is_running:
         return redirect('participant_dashboard')
 
-    team = Team.objects.filter(
-        Q(captain_user=request.user) | Q(participants__email=request.user.email),
-        registrations__tournament=tournament,
-        registrations__status=TournamentRegistration.Status.APPROVED,
-    ).distinct().first()
+    approved_registrations = TournamentRegistration.objects.filter(
+        tournament=tournament,
+        status=TournamentRegistration.Status.APPROVED,
+    ).select_related('team', 'team__captain_user').prefetch_related('team__participants')
+    my_registration = next(
+        (registration for registration in approved_registrations if user_has_registration_access(request.user, registration)),
+        None,
+    )
+    team = my_registration.team if my_registration is not None else None
     if not team:
         return redirect('participant_dashboard')
 

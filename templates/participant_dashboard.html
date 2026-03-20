@@ -3,14 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <title>Кабінет учасника</title>
-
 <style>
 body {
     margin: 0;
     font-family: Arial, sans-serif;
     background: #f4f6fb;
+    color: #172033;
 }
-
 .header {
     background: #111827;
     color: white;
@@ -18,33 +17,43 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
 }
-
 .container {
     max-width: 1100px;
     margin: auto;
     padding: 30px;
 }
-
 .card {
     background: white;
-    border-radius: 14px;
-    padding: 20px;
+    border-radius: 16px;
+    padding: 22px;
     margin-bottom: 20px;
     box-shadow: 0 8px 18px rgba(0, 0, 0, .08);
 }
-
 .card h2 {
     margin-top: 0;
 }
-
+.item {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+}
+.meta {
+    color: #555;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-top: 6px;
+}
 .action-row {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
     align-items: center;
+    margin-top: 10px;
 }
-
 .btn {
     display: inline-flex;
     align-items: center;
@@ -54,49 +63,34 @@ body {
     text-decoration: none;
     color: white;
     background: #2563eb;
-    margin-top: 10px;
-    margin-right: 8px;
     font-size: 13px;
     min-height: 36px;
     line-height: 1.2;
     font-weight: 600;
 }
-
+.btn-green {
+    background: #16a34a;
+}
 .btn.disabled {
     background: #9ca3af;
     pointer-events: none;
     cursor: default;
 }
-
-.btn-green {
-    background: #16a34a;
-}
-
-.item {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 10px;
-}
-
-.meta {
-    color: #555;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
 .message {
     margin-top: 10px;
     color: #4b5563;
 }
-
-.ok {
+.message.ok {
     color: #15803d;
 }
-
+.message.warn {
+    color: #92400e;
+}
+.message.bad {
+    color: #b91c1c;
+}
 </style>
 </head>
-
 <body>
 
 <div class="header">
@@ -108,19 +102,18 @@ body {
 </div>
 
 <div class="container">
-
     <div class="card">
         <h2>Моя команда</h2>
 
         {% if my_teams %}
             {% for team in my_teams %}
                 <div class="item">
-                    <b>{{ team.name }}</b>
-                    <div class="meta">
-                        Капітан: {{ team.captain_name }}
+                    <strong>{{ team.name }}</strong>
+                    <div class="meta">Капітан: {{ team.captain_name }}</div>
+                    <div class="action-row">
+                        <a class="btn" href="/team/{{ team.id }}/">Відкрити</a>
+                        <a class="btn btn-green" href="/team/{{ team.id }}/results/">Результати</a>
                     </div>
-                    <a class="btn" href="/team/{{ team.id }}/">Відкрити</a>
-                    <a class="btn btn-green" href="/team/{{ team.id }}/results/">Результати</a>
                 </div>
             {% endfor %}
         {% else %}
@@ -136,46 +129,50 @@ body {
 
         {% for item in tournaments_with_state %}
             <div class="item">
-                <b>{{ item.tournament.name }}</b>
-
+                <strong>{{ item.tournament.name }}</strong>
                 <div class="meta">
                     Початок: {{ item.tournament.start_date }}<br>
                     Завершення: {{ item.tournament.end_date }}<br>
                     Реєстрація до: {{ item.tournament.registration_end }}
                 </div>
 
-                {% if item.my_registration %}
-                    <p class="message ok">
-                        Команда вже зареєстрована. Статус заявки: {{ item.my_registration.status }}
-                    </p>
-                {% elif item.can_register %}
-                    <a class="btn btn-green" href="/register-team-for-tournament/{{ item.tournament.id }}/">
-                        Зареєструвати команду
-                    </a>
-                {% elif request.user.role == "captain" %}
-                    <p class="message">Реєстрація зараз недоступна.</p>
+                {% if item.my_registration and item.my_registration.status == "approved" %}
+                    <div class="message ok">Заявку схвалено. Команда допущена до турніру.</div>
+                {% elif item.my_registration and item.my_registration.status == "pending" %}
+                    <div class="message warn">Заявку подано. Очікується рішення організатора.</div>
+                {% elif item.my_registration and item.my_registration.status == "rejected" %}
+                    <div class="message bad">Попередню заявку відхилено.</div>
+                {% elif request.user.role == "captain" and not item.can_register %}
+                    <div class="message">Реєстрація зараз недоступна.</div>
                 {% endif %}
 
-                {% if item.can_open_tasks %}
-                    <div class="action-row">
+                <div class="action-row">
+                    {% if item.can_register %}
+                        <a class="btn btn-green" href="/register-team-for-tournament/{{ item.tournament.id }}/">
+                            {% if item.my_registration and item.my_registration.status == "rejected" %}Подати знову{% else %}Зареєструвати команду{% endif %}
+                        </a>
+                    {% endif %}
+
+                    {% if item.can_open_tasks %}
                         <a class="btn" href="/tournament/{{ item.tournament.id }}/tasks/">Завдання</a>
-                        {% if item.can_view_leaderboard %}
-                            <a class="btn btn-green" href="{% url 'tournament_leaderboard' item.tournament.id %}">Лідерборд</a>
-                        {% endif %}
-                    </div>
-                {% else %}
-                    <div class="action-row">
-                        <span class="btn disabled">Завдання</span>
-                        {% if item.can_view_leaderboard %}
-                            <a class="btn btn-green" href="{% url 'tournament_leaderboard' item.tournament.id %}">Лідерборд</a>
-                        {% endif %}
-                    </div>
-                    {% if item.my_registration and item.my_registration.status != "approved" %}
-                        <span class="message">Завдання відкриються після схвалення заявки.</span>
-                    {% elif item.tournament.is_running %}
-                        <span class="message">Потрібно, щоб заявка команди була схвалена.</span>
                     {% else %}
-                        <span class="message">Турнір ще не почався.</span>
+                        <span class="btn disabled">Завдання</span>
+                    {% endif %}
+
+                    {% if item.can_view_leaderboard %}
+                        <a class="btn btn-green" href="{% url 'tournament_leaderboard' item.tournament.id %}">Лідерборд</a>
+                    {% endif %}
+                </div>
+
+                {% if not item.can_open_tasks %}
+                    {% if item.my_registration and item.my_registration.status == "pending" %}
+                        <div class="message">Завдання відкриються після схвалення заявки.</div>
+                    {% elif item.my_registration and item.my_registration.status == "rejected" %}
+                        <div class="message">Повторну заявку можна подати під час відкритої реєстрації.</div>
+                    {% elif item.tournament.is_running %}
+                        <div class="message">Потрібно, щоб заявка команди була схвалена.</div>
+                    {% else %}
+                        <div class="message">Турнір ще не почався.</div>
                     {% endif %}
                 {% endif %}
             </div>
@@ -186,7 +183,6 @@ body {
 
     <div class="card">
         <h2>Результати</h2>
-
         {% if my_teams %}
             {% for team in my_teams %}
                 <a class="btn" href="/team/{{ team.id }}/results/">Результати команди {{ team.name }}</a>
@@ -195,7 +191,6 @@ body {
             <p>Ви ще не в команді.</p>
         {% endif %}
     </div>
-
 </div>
 
 </body>

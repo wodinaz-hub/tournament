@@ -63,6 +63,10 @@
                 {{ form.must_have }}
                 {% if form.must_have.errors %}<div class="field-errors">{{ form.must_have.errors }}</div>{% endif %}
 
+                <label>Офіційна відповідь / розбір</label>
+                {{ form.official_solution }}
+                {% if form.official_solution.errors %}<div class="field-errors">{{ form.official_solution.errors }}</div>{% endif %}
+
                 <div class="checkbox-row">
                     {{ form.is_draft }}
                     <label for="{{ form.is_draft.id_for_label }}" style="margin:0;">Чернетка</label>
@@ -70,7 +74,7 @@
                 {% if form.is_draft.errors %}<div class="field-errors">{{ form.is_draft.errors }}</div>{% endif %}
 
                 <button type="submit">{% if mode == 'edit' %}Зберегти{% else %}Створити{% endif %}</button>
-                <a class="back" href="/admin-dashboard/">Назад</a>
+                <a class="back" href="{{ back_url|default:'/admin-dashboard/' }}">Назад</a>
             </form>
         </div>
     </div>

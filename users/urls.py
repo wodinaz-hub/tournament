@@ -6,6 +6,7 @@ from .views import (
     logout_view,
     redirect_by_role,
     admin_dashboard,
+    create_user_by_admin,
     approve_user,
     update_user_role,
     delete_user,
@@ -43,6 +44,7 @@ urlpatterns = [
     path('redirect/', redirect_by_role, name='redirect_by_role'),
 
     path('admin-dashboard/', admin_dashboard, name='admin_dashboard'),
+    path('admin-create-user/', create_user_by_admin, name='create_user_by_admin'),
     path('approve-user/<int:user_id>/', approve_user, name='approve_user'),
     path('update-user-role/<int:user_id>/', update_user_role, name='update_user_role'),
     path('delete-user/<int:user_id>/', delete_user, name='delete_user'),

@@ -19,7 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-DEBUG = os.getenv("DEBUG") == "True"
+DEBUG = True
 
 default_allowed_hosts = [
     "127.0.0.1",
@@ -31,7 +31,7 @@ env_allowed_hosts = [
     for host in os.getenv("ALLOWED_HOSTS", "").split(",")
     if host.strip()
 ]
-ALLOWED_HOSTS = list(dict.fromkeys(default_allowed_hosts + env_allowed_hosts))
+ALLOWED_HOSTS =  ["*"]
 
 
 # APPLICATIONS
@@ -178,3 +178,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # DEFAULT FIELD
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.trycloudflare.com",
+    "https://serverdenis.pp.ua",
+]

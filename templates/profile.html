@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Профіль</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; color: #172033; }
+        .header { background: #111827; color: white; padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .nav a { color: white; text-decoration: none; }
+        .container { max-width: 1100px; margin: auto; padding: 30px; }
+        .card { background: white; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 8px 18px rgba(0, 0, 0, .08); }
+        .item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+        .meta { color: #555; font-size: 14px; line-height: 1.6; margin-top: 6px; }
+        .action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 9px; text-decoration: none; color: white; background: #2563eb; font-size: 13px; min-height: 36px; line-height: 1.2; font-weight: 600; }
+        .btn-green { background: #16a34a; }
+        .message { margin-top: 10px; color: #4b5563; }
+        .message.ok { color: #15803d; }
+        .message.warn { color: #92400e; }
+        .message.bad { color: #b91c1c; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <div class="nav">
+        <strong>Турнірна платформа</strong>
+        <a href="{% url 'home' %}">Головна</a>
+        <a href="{% url 'profile' %}">Профіль</a>
+        <a href="{% url 'my_team' %}">Моя команда</a>
+    </div>
+    <div class="nav">
+        <span>{{ profile_user.username }}</span>
+        <a href="{% url 'logout' %}">Вийти</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <h2>Профіль</h2>
+        <div class="meta">
+            Логін: {{ profile_user.username }}<br>
+            Email: {{ profile_user.email }}<br>
+            Роль: {{ profile_user.role }}
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Мої команди</h2>
+        {% if my_teams %}
+            {% for team in my_teams %}
+                <div class="item">
+                    <strong>{{ team.name }}</strong>
+                    <div class="meta">Капітан: {{ team.captain_name }}</div>
+                    <div class="action-row">
+                        <a class="btn" href="{% url 'team_detail' team.id %}">Відкрити</a>
+                        <a class="btn btn-green" href="{% url 'team_results' team.id %}">Результати</a>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>У вас ще немає команди.</p>
+            <a class="btn btn-green" href="{% url 'create_team' %}">Створити команду</a>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Мої турніри</h2>
+        {% for item in tournaments_with_state %}
+            <div class="item">
+                <strong>{{ item.tournament.name }}</strong>
+                <div class="meta">
+                    Початок: {{ item.tournament.start_date }}<br>
+                    Завершення: {{ item.tournament.end_date }}<br>
+                    Реєстрація до: {{ item.tournament.registration_end }}
+                </div>
+                {% if item.my_registration and item.my_registration.status == "approved" %}
+                    <div class="message ok">Заявку схвалено. Команда допущена до турніру.</div>
+                {% elif item.my_registration and item.my_registration.status == "pending" %}
+                    <div class="message warn">Заявку подано. Очікується рішення організатора.</div>
+                {% elif item.my_registration and item.my_registration.status == "rejected" %}
+                    <div class="message bad">Попередню заявку відхилено.</div>
+                {% endif %}
+                <div class="action-row">
+                    <a class="btn" href="{% url 'public_tournament_detail' item.tournament.id %}">Сторінка турніру</a>
+                    {% if item.can_open_tasks %}
+                        <a class="btn btn-green" href="{% url 'tournament_tasks' item.tournament.id %}">Завдання</a>
+                    {% endif %}
+                    {% if item.can_view_leaderboard %}
+                        <a class="btn btn-green" href="{% url 'tournament_leaderboard' item.tournament.id %}">Лідерборд</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% empty %}
+            <p>Доступних турнірів зараз немає.</p>
+        {% endfor %}
+    </div>
+</div>
+</body>
+</html>

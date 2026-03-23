@@ -7,6 +7,7 @@ class CustomUser(AbstractUser):
         ('participant', 'Participant'),
         ('captain', 'Captain'),
         ('jury', 'Jury'),
+        ('organizer', 'Organizer'),
         ('admin', 'Admin'),
     )
 

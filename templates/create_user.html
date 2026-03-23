@@ -135,7 +135,7 @@
                     <h1>Створити користувача</h1>
                     <div class="page-subtitle">Адміністратор може вручну створити користувача будь-якої ролі.</div>
                 </div>
-                <a class="back-link" href="{% url 'admin_dashboard' %}">Назад до адмінки</a>
+                <a class="back-link" href="{{ dashboard_url|default:request.path }}">Назад до кабінету</a>
             </div>
 
             {% if form.non_field_errors %}
@@ -186,7 +186,7 @@
                 </div>
 
                 <div class="actions">
-                    <a class="btn-secondary" href="{% url 'admin_dashboard' %}">Назад</a>
+                    <a class="btn-secondary" href="{{ dashboard_url|default:request.path }}">Назад</a>
                     <button class="btn" type="submit">Створити користувача</button>
                 </div>
             </form>

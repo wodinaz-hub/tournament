@@ -4,10 +4,7 @@
     <meta charset="UTF-8">
     <title>Вхід</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -16,8 +13,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
         }
-
         .card {
             width: 100%;
             max-width: 420px;
@@ -26,25 +23,21 @@
             border-radius: 16px;
             box-shadow: 0 12px 30px rgba(0,0,0,0.08);
         }
-
         h1 {
             margin: 0 0 8px;
             font-size: 28px;
             text-align: center;
         }
-
         .sub {
             text-align: center;
             color: #666;
             margin-bottom: 24px;
         }
-
         label {
             display: block;
             margin-bottom: 6px;
             font-weight: 600;
         }
-
         input {
             width: 100%;
             padding: 12px 14px;
@@ -53,7 +46,6 @@
             border-radius: 10px;
             font-size: 15px;
         }
-
         button {
             width: 100%;
             border: none;
@@ -64,11 +56,6 @@
             font-size: 16px;
             cursor: pointer;
         }
-
-        button:hover {
-            background: #1d4ed8;
-        }
-
         .msg {
             background: #fff4d6;
             color: #7a5a00;
@@ -76,18 +63,15 @@
             border-radius: 10px;
             margin-bottom: 16px;
         }
-
         .field-errors {
             color: #b00020;
             font-size: 14px;
             margin: -4px 0 10px;
         }
-
         .bottom {
             text-align: center;
             margin-top: 18px;
         }
-
         .bottom a {
             color: #2563eb;
             text-decoration: none;
@@ -109,6 +93,9 @@
 
         <form method="post">
             {% csrf_token %}
+            {% if next_url %}
+                <input type="hidden" name="next" value="{{ next_url }}">
+            {% endif %}
 
             <label for="{{ form.username.id_for_label }}">Логін</label>
             {{ form.username }}
@@ -126,7 +113,7 @@
         </form>
 
         <div class="bottom">
-            Немає акаунта? <a href="/register/">Зареєструватися</a>
+            Немає акаунта? <a href="{% url 'register' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}">Зареєструватися</a>
         </div>
     </div>
 </body>

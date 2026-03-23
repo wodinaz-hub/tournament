@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Турнірна платформа</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #172033;
+            background: linear-gradient(180deg, #eaf2ff 0%, #f7f9fc 36%, #ffffff 100%);
+        }
+        .wrap {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px 20px 48px;
+        }
+        .topbar, .hero, .section-head, .auth-actions, .tournament-meta, .leader-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .brand {
+            font-size: 28px;
+            font-weight: 800;
+        }
+        .topbar a, .button, .button-secondary, .card-link {
+            text-decoration: none;
+        }
+        .auth-actions a, .button, .button-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 11px 16px;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .button {
+            background: #2563eb;
+            color: white;
+        }
+        .button-secondary {
+            background: white;
+            color: #2563eb;
+            border: 1px solid #cbd5e1;
+        }
+        .hero {
+            background: linear-gradient(135deg, #173b77 0%, #2563eb 55%, #1d4ed8 100%);
+            color: white;
+            border-radius: 28px;
+            padding: 34px;
+            margin: 24px 0 28px;
+            box-shadow: 0 20px 40px rgba(37, 99, 235, 0.22);
+        }
+        .hero-copy {
+            max-width: 620px;
+        }
+        .hero h1 {
+            margin: 0 0 12px;
+            font-size: 42px;
+            line-height: 1.1;
+        }
+        .hero p {
+            margin: 0;
+            line-height: 1.7;
+            color: rgba(255,255,255,0.88);
+        }
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(120px, 1fr));
+            gap: 14px;
+            min-width: 320px;
+        }
+        .hero-stat {
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 18px;
+            padding: 16px;
+        }
+        .hero-stat strong {
+            display: block;
+            font-size: 28px;
+            margin-bottom: 4px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 18px;
+        }
+        .section {
+            margin-top: 30px;
+        }
+        .section-head {
+            margin-bottom: 14px;
+        }
+        .section-head h2 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .section-note {
+            color: #64748b;
+        }
+        .card {
+            background: white;
+            border: 1px solid #d9e2ef;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+        }
+        .tournament-card h3, .news-card h3 {
+            margin: 0 0 10px;
+            font-size: 22px;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .status-registration { background: #dbeafe; color: #1d4ed8; }
+        .status-running { background: #dcfce7; color: #166534; }
+        .status-finished { background: #fee2e2; color: #991b1b; }
+        .status-scheduled { background: #ede9fe; color: #6d28d9; }
+        .tournament-meta {
+            align-items: flex-start;
+            color: #475569;
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+        .mini-board {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 14px;
+            padding-top: 14px;
+        }
+        .leader-row {
+            padding: 8px 0;
+            border-bottom: 1px solid #eef2f7;
+        }
+        .leader-row:last-child {
+            border-bottom: none;
+        }
+        .empty {
+            color: #64748b;
+        }
+        .news-list {
+            display: grid;
+            gap: 12px;
+        }
+        .news-card {
+            background: #f8fbff;
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            padding: 16px;
+        }
+        @media (max-width: 980px) {
+            .grid-3, .grid-2 {
+                grid-template-columns: 1fr;
+            }
+            .hero-stats {
+                grid-template-columns: 1fr;
+                min-width: 0;
+                width: 100%;
+            }
+            .hero h1 {
+                font-size: 34px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <div class="brand">Турнірна платформа</div>
+            <div class="auth-actions">
+                {% if request.user.is_authenticated %}
+                    <div class="nav-links">
+                        <a class="button-secondary" href="{% url 'home' %}">Головна</a>
+                        {% if request.user.role == 'participant' or request.user.role == 'captain' %}
+                            <a class="button-secondary" href="{% url 'profile' %}">Профіль</a>
+                            <a class="button-secondary" href="{% url 'my_team' %}">Моя команда</a>
+                        {% elif request.user.role == 'jury' %}
+                            <a class="button-secondary" href="{% url 'jury_dashboard' %}">Журі</a>
+                        {% elif request.user.role == 'organizer' %}
+                            <a class="button-secondary" href="{% url 'organizer_dashboard' %}">Мої турніри</a>
+                        {% else %}
+                            <a class="button-secondary" href="{% url 'admin_dashboard' %}">Адмінка</a>
+                        {% endif %}
+                    </div>
+                    <a class="button" href="{% url 'logout' %}">Вийти</a>
+                {% else %}
+                    <a class="button-secondary" href="{% url 'login' %}">Увійти</a>
+                    <a class="button" href="{% url 'register' %}">Зареєструватися</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="hero">
+            <div class="hero-copy">
+                <h1>Турніри, заявки, журі та публічний лідерборд в одному місці</h1>
+                <p>Тут можна переглядати активні та завершені турніри, відкривати форму реєстрації, стежити за статусами й дивитися результати без окремого входу на старті.</p>
+            </div>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <strong>{{ tournament_rows|length }}</strong>
+                    Усього турнірів
+                </div>
+                <div class="hero-stat">
+                    <strong>{{ featured_tournaments|length }}</strong>
+                    Відкрита реєстрація
+                </div>
+                <div class="hero-stat">
+                    <strong>{{ finished_tournaments|length }}</strong>
+                    Завершено
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-head">
+                <h2>Турніри</h2>
+                <div class="section-note">Натисни на картку, щоб відкрити сторінку турніру та форму реєстрації.</div>
+            </div>
+            <div class="grid-3">
+                {% for row in tournament_rows %}
+                    <a class="card card-link tournament-card" href="{% url 'public_tournament_detail' row.tournament.id %}">
+                        <div class="section-head" style="margin-bottom: 10px;">
+                            <h3>{{ row.tournament.name }}</h3>
+                            <span class="status-badge status-{{ row.tournament.lifecycle_status }}">{{ row.tournament.lifecycle_status_label }}</span>
+                        </div>
+                        <div class="tournament-meta">
+                            <div>
+                                Реєстрація: {{ row.tournament.registration_start|default:"-" }} - {{ row.tournament.registration_end|default:"-" }}<br>
+                                Старт: {{ row.tournament.start_date|default:"-" }}<br>
+                                Фініш: {{ row.tournament.end_date|default:"-" }}
+                            </div>
+                            <div>
+                                Схвалено команд: {{ row.approved_count }}<br>
+                                Очікують: {{ row.pending_count }}
+                            </div>
+                        </div>
+                        <div>{{ row.tournament.description|truncatechars:180 }}</div>
+                        <div class="mini-board">
+                            <strong>Топ команд</strong>
+                            {% for item in row.leaderboard_preview %}
+                                <div class="leader-row">
+                                    <span>#{{ item.place }} {{ item.team.name }}</span>
+                                    <strong>{% if item.overall_average is not None %}{{ item.overall_average|floatformat:1 }}{% else %}-{% endif %}</strong>
+                                </div>
+                            {% empty %}
+                                <div class="empty" style="margin-top: 8px;">Лідерборд з'явиться після оцінювання.</div>
+                            {% endfor %}
+                        </div>
+                    </a>
+                {% empty %}
+                    <div class="card empty">Опублікованих турнірів поки немає.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="section grid-2">
+            <div class="card">
+                <div class="section-head">
+                    <h2>Новини</h2>
+                    <div class="section-note">Автоматичні оновлення по турнірах</div>
+                </div>
+                <div class="news-list">
+                    {% for news in news_rows %}
+                        <div class="news-card">
+                            <h3>{{ news.tournament.name }}</h3>
+                            <div style="color:#475569; line-height:1.6;">{{ news.text }}</div>
+                        </div>
+                    {% empty %}
+                        <div class="empty">Поки немає новин.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-head">
+                    <h2>Швидкий огляд</h2>
+                    <div class="section-note">Що зараз відбувається</div>
+                </div>
+                <div class="news-list">
+                    <div class="news-card">
+                        <h3>Реєстрація</h3>
+                        <div>{{ featured_tournaments|length }} турнір(и) зараз приймають заявки.</div>
+                    </div>
+                    <div class="news-card">
+                        <h3>Активні турніри</h3>
+                        <div>{{ active_tournaments|length }} турнір(и) вже тривають.</div>
+                    </div>
+                    <div class="news-card">
+                        <h3>Результати</h3>
+                        <div>{{ finished_tournaments|length }} турнір(и) вже мають підсумки та лідерборд.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

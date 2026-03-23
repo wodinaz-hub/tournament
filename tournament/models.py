@@ -43,6 +43,12 @@ class Tournament(models.Model):
         related_name="tournaments_created",
         verbose_name="Створено користувачем",
     )
+    jury_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="jury_tournaments",
+        verbose_name="Призначене журі",
+    )
 
     class Meta:
         ordering = ["-start_date", "name"]

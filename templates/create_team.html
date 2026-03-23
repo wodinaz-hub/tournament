@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Створити команду</title>
+    <title>{% if mode == 'edit' %}Редагувати команду{% else %}Створити команду{% endif %}</title>
     <style>
         body {
             margin: 0;
@@ -10,26 +10,22 @@
             background: #f4f6fb;
             padding: 30px 20px;
         }
-
         .wrap {
             max-width: 760px;
             margin: 0 auto;
         }
-
         .card {
             background: white;
             padding: 28px;
             border-radius: 16px;
             box-shadow: 0 10px 24px rgba(0,0,0,.06);
         }
-
         label {
             display: block;
             margin-bottom: 6px;
             font-weight: 600;
         }
-
-        input, select, textarea, .form-input {
+        input, textarea, .form-input {
             width: 100%;
             padding: 12px 14px;
             margin-bottom: 12px;
@@ -37,7 +33,13 @@
             border-radius: 10px;
             box-sizing: border-box;
         }
-
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
         button {
             border: none;
             background: #16a34a;
@@ -46,13 +48,10 @@
             border-radius: 10px;
             cursor: pointer;
         }
-
         a {
-            margin-left: 10px;
             color: #2563eb;
             text-decoration: none;
         }
-
         .field-errors {
             color: #b00020;
             font-size: 14px;
@@ -63,43 +62,48 @@
 <body>
     <div class="wrap">
         <div class="card">
-            <h1>Створити команду</h1>
+            <h1>{% if mode == 'edit' %}Редагувати команду{% else %}Створити команду{% endif %}</h1>
 
             <form method="post">
                 {% csrf_token %}
+                {% if next_url %}
+                    <input type="hidden" name="next" value="{{ next_url }}">
+                {% endif %}
 
-                <label>Назва команди</label>
+                <label for="{{ form.name.id_for_label }}">Назва команди</label>
                 {{ form.name }}
                 {% if form.name.errors %}
                     <div class="field-errors">{{ form.name.errors }}</div>
                 {% endif %}
 
-                <label>Ім'я капітана</label>
+                <label for="{{ form.captain_name.id_for_label }}">Ім'я капітана</label>
                 {{ form.captain_name }}
                 {% if form.captain_name.errors %}
                     <div class="field-errors">{{ form.captain_name.errors }}</div>
                 {% endif %}
 
-                <label>Email капітана</label>
+                <label for="{{ form.captain_email.id_for_label }}">Email капітана</label>
                 {{ form.captain_email }}
                 {% if form.captain_email.errors %}
                     <div class="field-errors">{{ form.captain_email.errors }}</div>
                 {% endif %}
 
-                <label>Школа</label>
+                <label for="{{ form.school.id_for_label }}">Школа</label>
                 {{ form.school }}
                 {% if form.school.errors %}
                     <div class="field-errors">{{ form.school.errors }}</div>
                 {% endif %}
 
-                <label>Telegram</label>
+                <label for="{{ form.telegram.id_for_label }}">Telegram</label>
                 {{ form.telegram }}
                 {% if form.telegram.errors %}
                     <div class="field-errors">{{ form.telegram.errors }}</div>
                 {% endif %}
 
-                <button type="submit">Створити команду</button>
-                <a href="/participant-dashboard/">Назад</a>
+                <div class="toolbar">
+                    <button type="submit">{% if mode == 'edit' %}Зберегти зміни{% else %}Створити команду{% endif %}</button>
+                    <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'participant_dashboard' %}{% endif %}">Назад</a>
+                </div>
             </form>
         </div>
     </div>

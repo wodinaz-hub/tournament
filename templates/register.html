@@ -48,7 +48,7 @@
             margin-bottom: 6px;
             font-weight: 600;
         }
-        input, select {
+        input {
             width: 100%;
             padding: 12px 14px;
             margin-bottom: 10px;
@@ -104,10 +104,10 @@
 <body>
     <div class="card">
         <h1>Реєстрація</h1>
-        <div class="sub">Створіть новий акаунт і виберіть роль одразу під час реєстрації.</div>
+        <div class="sub">Створіть звичайний акаунт учасника, щоб подавати заявки на турніри.</div>
 
         <div class="hint">
-            Учасник активується одразу. Капітан, журі та адміністратор потребують схвалення адміністратором.
+            Після реєстрації акаунт учасника активується одразу. Далі можна створити команду й подати заявку на турнір.
         </div>
 
         {% if form.non_field_errors %}
@@ -116,6 +116,9 @@
 
         <form method="post">
             {% csrf_token %}
+            {% if next_url %}
+                <input type="hidden" name="next" value="{{ next_url }}">
+            {% endif %}
 
             <label for="{{ form.username.id_for_label }}">Логін</label>
             {{ form.username }}
@@ -124,10 +127,6 @@
             <label for="{{ form.email.id_for_label }}">Email</label>
             {{ form.email }}
             {% if form.email.errors %}<div class="field-errors">{{ form.email.errors }}</div>{% endif %}
-
-            <label for="{{ form.role.id_for_label }}">Роль</label>
-            {{ form.role }}
-            {% if form.role.errors %}<div class="field-errors">{{ form.role.errors }}</div>{% endif %}
 
             <label for="{{ form.password1.id_for_label }}">Пароль</label>
             {{ form.password1 }}
@@ -142,7 +141,7 @@
         </form>
 
         <div class="bottom">
-            Вже є акаунт? <a href="/login/">Увійти</a>
+            Вже є акаунт? <a href="{% url 'login' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}">Увійти</a>
         </div>
     </div>
 </body>

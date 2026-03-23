@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Кабінет організатора</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; color: #172033; }
+        .wrap { max-width: 1180px; margin: 0 auto; padding: 30px 20px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .title { font-size: 30px; font-weight: 700; }
+        .btn, .btn-secondary { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; border: none; cursor: pointer; border-radius: 10px; padding: 10px 14px; min-height: 40px; font-size: 14px; font-weight: 600; color: white; }
+        .btn { background: #16a34a; }
+        .btn-secondary { background: #2563eb; }
+        .card { background: white; border-radius: 18px; padding: 20px; box-shadow: 0 12px 28px rgba(17, 24, 39, 0.08); margin-bottom: 18px; }
+        .item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #fbfdff; }
+        .meta { color: #64748b; line-height: 1.6; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <div>
+                <div class="title">Кабінет організатора</div>
+                <div class="meta">Вітаю, {{ request.user.username }}</div>
+            </div>
+            <div class="actions">
+                <a class="btn-secondary" href="{% url 'home' %}">Головна</a>
+                <a class="btn" href="{% url 'create_tournament' %}">Створити турнір</a>
+                <a class="btn-secondary" href="{% url 'logout' %}">Вийти</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Мої турніри</h2>
+            {% for tournament in tournaments %}
+                <div class="item">
+                    <strong>{{ tournament.name }}</strong>
+                    <div class="meta">
+                        Реєстрація: {{ tournament.registration_start }} - {{ tournament.registration_end }}<br>
+                        Турнір: {{ tournament.start_date }} - {{ tournament.end_date }}<br>
+                        Журі: {% for jury in tournament.jury_users.all %}{{ jury.username }}{% if not forloop.last %}, {% endif %}{% empty %}не призначено{% endfor %}
+                    </div>
+                    <div class="actions">
+                        <a class="btn-secondary" href="{% url 'edit_tournament' tournament.id %}">Редагувати</a>
+                        <a class="btn-secondary" href="{% url 'create_tournament_task' tournament.id %}">Додати завдання</a>
+                    </div>
+                </div>
+            {% empty %}
+                <p>У вас ще немає турнірів.</p>
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <h2>Заявки на мої турніри</h2>
+            {% for reg in registrations %}
+                <div class="item">
+                    <strong>{{ reg.team.name }} -> {{ reg.tournament.name }}</strong>
+                    <div class="meta">Подав: {{ reg.registered_by.username }} | Статус: {{ reg.get_status_display }}</div>
+                    {% if reg.status == "pending" %}
+                        <div class="actions">
+                            <form method="post" action="{% url 'approve_registration' reg.id %}">
+                                {% csrf_token %}
+                                <button class="btn" type="submit">Схвалити</button>
+                            </form>
+                            <form method="post" action="{% url 'reject_registration' reg.id %}">
+                                {% csrf_token %}
+                                <button class="btn-secondary" type="submit">Відхилити</button>
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+            {% empty %}
+                <p>Заявок поки немає.</p>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

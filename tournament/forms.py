@@ -4,6 +4,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from .models import Evaluation, Participant, Submission, Task, Team, Tournament, TournamentRegistration
+from users.models import CustomUser
 
 
 REGISTRATION_FIELD_TYPE_CHOICES = {
@@ -147,6 +148,7 @@ class TournamentForm(forms.ModelForm):
             'min_team_members',
             'max_team_members',
             'max_teams',
+            'jury_users',
             'is_draft',
         ]
         widgets = {
@@ -156,6 +158,7 @@ class TournamentForm(forms.ModelForm):
             'min_team_members': forms.NumberInput(attrs={'class': 'form-input', 'min': 1}),
             'max_team_members': forms.NumberInput(attrs={'class': 'form-input', 'min': 1}),
             'max_teams': forms.NumberInput(attrs={'class': 'form-input'}),
+            'jury_users': forms.SelectMultiple(attrs={'class': 'form-input', 'size': 6}),
             'is_draft': forms.CheckboxInput(),
         }
 
@@ -174,8 +177,13 @@ class TournamentForm(forms.ModelForm):
             'registration_end',
             'min_team_members',
             'max_team_members',
+            'jury_users',
         ]:
             self.fields[field_name].required = False
+        self.fields['jury_users'].queryset = CustomUser.objects.filter(
+            role='jury',
+            is_approved=True,
+        ).order_by('username')
 
     def clean(self):
         cleaned_data = super().clean()

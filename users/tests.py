@@ -39,6 +39,13 @@ class TournamentPlatformViewTests(TestCase):
             password="secret123",
             email="admin@example.com",
         )
+        self.organizer_user = User.objects.create_user(
+            username="organizer",
+            password="secret123",
+            role="organizer",
+            is_approved=True,
+            email="organizer@example.com",
+        )
         self.client.force_login(self.captain)
 
     def create_tournament(self, **overrides):
@@ -56,24 +63,110 @@ class TournamentPlatformViewTests(TestCase):
         defaults.update(overrides)
         return Tournament.objects.create(**defaults)
 
-    def test_register_form_saves_selected_role(self):
+    def test_register_form_creates_participant_and_logs_in(self):
         self.client.logout()
 
         response = self.client.post(
             reverse("register"),
             {
-                "username": "newcaptain",
-                "email": "newcaptain@example.com",
-                "role": "captain",
+                "username": "newparticipant",
+                "email": "newparticipant@example.com",
                 "password1": "StrongPass123!",
                 "password2": "StrongPass123!",
             },
         )
 
-        self.assertRedirects(response, reverse("login"))
-        created_user = User.objects.get(username="newcaptain")
-        self.assertEqual(created_user.role, "captain")
-        self.assertFalse(created_user.is_approved)
+        self.assertRedirects(response, reverse("home"))
+        created_user = User.objects.get(username="newparticipant")
+        self.assertEqual(created_user.role, "participant")
+        self.assertTrue(created_user.is_approved)
+
+    def test_register_form_rejects_duplicate_email(self):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "anotheruser",
+                "email": self.participant_user.email,
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Користувач з таким email уже існує.")
+
+    def test_home_page_is_public_and_shows_tournaments(self):
+        self.client.logout()
+        tournament = self.create_tournament(name="Public Cup")
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Public Cup")
+        self.assertContains(response, reverse("public_tournament_detail", args=[tournament.id]))
+
+    def test_public_tournament_detail_prompts_guest_to_register(self):
+        self.client.logout()
+        tournament = self.create_tournament(
+            name="Guest Cup",
+            registration_fields_config=[
+                {"key": "school", "label": "Школа", "type": "text", "required": True},
+            ],
+        )
+
+        response = self.client.get(reverse("public_tournament_detail", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Зареєструватися")
+        self.assertContains(response, "Школа")
+
+    def test_participant_can_create_team(self):
+        self.client.force_login(self.participant_user)
+
+        response = self.client.post(
+            reverse("create_team"),
+            {
+                "name": "Participant Team",
+                "captain_name": "Member Captain",
+                "captain_email": "member@example.com",
+                "school": "School 1",
+                "telegram": "@team",
+            },
+        )
+
+        self.assertRedirects(response, reverse("participant_dashboard"))
+        self.assertTrue(Team.objects.filter(name="Participant Team", captain_user=self.participant_user).exists())
+
+    def test_participant_can_submit_registration_from_public_tournament_page(self):
+        tournament = self.create_tournament(
+            registration_fields_config=[
+                {"key": "school", "label": "Школа", "type": "text", "required": True},
+            ],
+        )
+        team = Team.objects.create(
+            name="Open Team",
+            captain_user=self.participant_user,
+            captain_name="Member Captain",
+            captain_email=self.participant_user.email,
+        )
+        self.client.force_login(self.participant_user)
+
+        response = self.client.post(
+            reverse("public_tournament_detail", args=[tournament.id]),
+            {
+                "team": team.id,
+                "field_school": "Ліцей",
+            },
+        )
+
+        self.assertRedirects(response, reverse("participant_dashboard"))
+        registration = TournamentRegistration.objects.get(tournament=tournament, team=team)
+        self.assertEqual(registration.status, TournamentRegistration.Status.PENDING)
+        self.assertEqual(registration.form_answers["school"], "Ліцей")
+        self.participant_user.refresh_from_db()
+        self.assertEqual(self.participant_user.role, "captain")
 
     def test_admin_can_create_user_from_users_tab(self):
         self.client.force_login(self.admin_user)
@@ -93,6 +186,37 @@ class TournamentPlatformViewTests(TestCase):
         created_user = User.objects.get(username="manual_jury")
         self.assertEqual(created_user.role, "jury")
         self.assertFalse(created_user.is_approved)
+
+    def test_admin_cannot_create_admin_user(self):
+        admin_user = User.objects.create_user(
+            username="plainadmin",
+            password="secret123",
+            role="admin",
+            is_approved=True,
+            email="plainadmin@example.com",
+        )
+        self.client.force_login(admin_user)
+
+        response = self.client.post(
+            reverse("create_user_by_admin"),
+            {
+                "username": "blocked_admin",
+                "email": "blocked_admin@example.com",
+                "role": "admin",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.filter(username="blocked_admin").exists())
+
+    def test_organizer_can_open_own_dashboard(self):
+        self.client.force_login(self.organizer_user)
+
+        response = self.client.get(reverse("organizer_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
 
     def test_admin_can_open_separate_create_user_page(self):
         self.client.force_login(self.admin_user)

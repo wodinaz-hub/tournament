@@ -17,10 +17,10 @@ class Tournament(models.Model):
         default=list,
         verbose_name="Поля форми реєстрації",
     )
-    start_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата початку")
-    end_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата завершення")
-    registration_start = models.DateTimeField(null=True, blank=True, verbose_name="Початок реєстрації")
-    registration_end = models.DateTimeField(null=True, blank=True, verbose_name="Завершення реєстрації")
+    start_date = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name="Дата початку")
+    end_date = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name="Дата завершення")
+    registration_start = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name="Початок реєстрації")
+    registration_end = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name="Завершення реєстрації")
     max_teams = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -36,7 +36,7 @@ class Tournament(models.Model):
         blank=True,
         verbose_name="Максимальна кількість людей у команді",
     )
-    is_draft = models.BooleanField(default=True, verbose_name="Чернетка")
+    is_draft = models.BooleanField(default=True, db_index=True, verbose_name="Чернетка")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -178,6 +178,7 @@ class TournamentRegistration(models.Model):
         max_length=20,
         choices=Status.choices,
         default=Status.PENDING,
+        db_index=True,
         verbose_name="Статус заявки",
     )
     form_answers = models.JSONField(
@@ -216,6 +217,12 @@ class Participant(models.Model):
         ordering = ["full_name"]
         verbose_name = "Учасник"
         verbose_name_plural = "Учасники"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["team", "email"],
+                name="unique_participant_email_per_team",
+            )
+        ]
 
     def __str__(self):
         return self.full_name
@@ -372,3 +379,36 @@ class Evaluation(models.Model):
             + self.score_functionality
             + self.score_ux
         ) / 4.0
+
+
+class RegistrationMember(models.Model):
+    registration = models.ForeignKey(
+        TournamentRegistration,
+        on_delete=models.CASCADE,
+        related_name="members",
+        verbose_name="Заявка",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="registration_memberships",
+        verbose_name="Пов'язаний користувач",
+    )
+    full_name = models.CharField(max_length=255, verbose_name="ПІБ")
+    email = models.EmailField(verbose_name="Email")
+
+    class Meta:
+        ordering = ["full_name"]
+        verbose_name = "Учасник заявки"
+        verbose_name_plural = "Учасники заявок"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["registration", "email"],
+                name="unique_registration_member_email",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.email})"

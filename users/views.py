@@ -2,6 +2,7 @@ from statistics import mean
 
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
@@ -22,12 +23,14 @@ from tournament.models import (
     Evaluation,
     JuryAssignment,
     Participant,
+    RegistrationMember,
     Submission,
     Task,
     Team,
     Tournament,
     TournamentRegistration,
 )
+from tournament.services import RegistrationService
 
 from .forms import AdminCreateUserForm, LoginForm, RegisterForm
 from .models import CustomUser
@@ -163,26 +166,10 @@ def is_tournament_edit_locked(tournament):
     )
 
 
-def registration_participant_emails(registration):
-    emails = set()
-    for value in registration.form_answers.values():
-        if not isinstance(value, list):
-            continue
-        for item in value:
-            if not isinstance(item, dict):
-                continue
-            email = (item.get('email') or '').strip().lower()
-            if email:
-                emails.add(email)
-    return emails
-
-
 def user_has_registration_access(user, registration):
-    user_email = (user.email or '').strip().lower()
     return (
         registration.team.captain_user_id == user.id
-        or registration.team.participants.filter(email=user.email).exists()
-        or user_email in registration_participant_emails(registration)
+        or registration.members.filter(user=user).exists()
     )
 
 
@@ -197,21 +184,30 @@ def build_admin_dashboard_context(current_user, admin_create_user_form=None):
     submissions = Submission.objects.select_related('team', 'task', 'task__tournament').all()
     jury_assignments = JuryAssignment.objects.select_related('jury_user', 'submission').all()
     evaluations = Evaluation.objects.select_related('assignment').all()
-    registrations = TournamentRegistration.objects.select_related('tournament', 'team', 'registered_by').all()
+    registrations = TournamentRegistration.objects.select_related(
+        'tournament',
+        'team',
+        'registered_by',
+    ).prefetch_related('members').all()
     for registration in registrations:
         fields_by_key = {
             field['key']: field.get('label', field['key'])
             for field in registration.tournament.registration_fields_config
+        }
+        members_by_key = {
+            field['key']
+            for field in registration.tournament.registration_fields_config
+            if field.get('type') == 'participants'
         }
         registration.display_form_answers = [
             {
                 'label': fields_by_key.get(key, key),
                 'value': (
                     ', '.join(
-                        f"{item.get('full_name', '-') } ({item.get('email', '-')})"
-                        for item in value
+                        f"{member.full_name} ({member.email})"
+                        for member in registration.members.all()
                     )
-                    if isinstance(value, list)
+                    if key in members_by_key
                     else value
                 ),
             }
@@ -347,6 +343,10 @@ def register_view(request):
             user.role = 'participant'
             user.is_approved = True
             user.save()
+            RegistrationMember.objects.filter(
+                user__isnull=True,
+                email__iexact=user.email,
+            ).update(user=user)
             login(request, user)
             return redirect(get_safe_redirect(request, next_url, reverse('home')))
     else:
@@ -451,27 +451,18 @@ def public_tournament_detail(request, tournament_id):
                 if request.user.role == 'participant':
                     request.user.role = 'captain'
                     request.user.save(update_fields=['role'])
-                TournamentRegistration.objects.filter(
-                    tournament=tournament,
-                    team=team,
-                    status=TournamentRegistration.Status.REJECTED,
-                ).delete()
-                TournamentRegistration.objects.create(
-                    tournament=tournament,
-                    team=team,
-                    registered_by=request.user,
-                    status=TournamentRegistration.Status.PENDING,
-                    form_answers=registration_form.cleaned_form_answers(),
-                )
-                participants_payload = registration_form.cleaned_participants()
-                if participants_payload is not None:
-                    for item in participants_payload:
-                        Participant.objects.get_or_create(
-                            team=team,
-                            email=item['email'],
-                            defaults={'full_name': item['full_name']},
-                        )
-                return redirect('participant_dashboard')
+                try:
+                    RegistrationService.submit_registration(
+                        tournament=tournament,
+                        team=team,
+                        registered_by=request.user,
+                        form_answers=registration_form.cleaned_form_answers(),
+                        roster=registration_form.cleaned_participants(),
+                    )
+                except ValidationError as exc:
+                    registration_form.add_error(None, exc)
+                else:
+                    return redirect('participant_dashboard')
 
     current_path = reverse('public_tournament_detail', args=[tournament.id])
     return render(request, 'public_tournament_detail.html', {
@@ -932,15 +923,13 @@ def profile_view(request):
         Tournament.objects.filter(is_draft=False).order_by('-start_date')
     )
 
-    registrations = TournamentRegistration.objects.select_related(
+    my_registrations = list(TournamentRegistration.objects.select_related(
         'tournament',
         'team',
         'team__captain_user',
-    ).prefetch_related('team__participants')
-    my_registrations = [
-        reg for reg in registrations
-        if user_has_registration_access(request.user, reg)
-    ]
+    ).prefetch_related('team__participants', 'members').filter(
+        Q(team__captain_user=request.user) | Q(members__user=request.user)
+    ).distinct())
 
     my_registration_by_tournament_id = {}
     for reg in my_registrations:
@@ -1074,49 +1063,17 @@ def register_team_for_tournament(request, tournament_id):
             if request.user.role == 'participant':
                 request.user.role = 'captain'
                 request.user.save(update_fields=['role'])
-            roster_participants = form.cleaned_participants()
-            members_count = 1 + len(roster_participants) if roster_participants is not None else team.members_count
-            if (
-                tournament.min_team_members is not None
-                and members_count < tournament.min_team_members
-            ):
-                form.add_error(
-                    'team',
-                    f'У команді замало людей. Потрібно щонайменше: {tournament.min_team_members}.',
-                )
-            elif (
-                tournament.max_team_members is not None
-                and members_count > tournament.max_team_members
-            ):
-                form.add_error(
-                    'team',
-                    f'У команді забагато людей. Максимум дозволено: {tournament.max_team_members}.',
-                )
-            else:
-                if roster_participants is not None:
-                    existing_participants = {
-                        participant.email.lower(): participant
-                        for participant in team.participants.all()
-                    }
-                    for item in roster_participants:
-                        email = item['email'].lower()
-                        participant = existing_participants.get(email)
-                        if participant is None:
-                            Participant.objects.create(
-                                team=team,
-                                full_name=item['full_name'],
-                                email=item['email'],
-                            )
-                        elif participant.full_name != item['full_name']:
-                            participant.full_name = item['full_name']
-                            participant.save(update_fields=['full_name'])
-                TournamentRegistration.objects.create(
+            try:
+                RegistrationService.submit_registration(
                     tournament=tournament,
                     team=team,
                     registered_by=request.user,
-                    status=TournamentRegistration.Status.PENDING,
                     form_answers=form.cleaned_form_answers(),
+                    roster=form.cleaned_participants(),
                 )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
                 return redirect('participant_dashboard')
     else:
         form = TournamentRegistrationForm(user=request.user, tournament=tournament)
@@ -1273,7 +1230,7 @@ def tournament_tasks(request, tournament_id):
     approved_registrations = TournamentRegistration.objects.filter(
         tournament=tournament,
         status=TournamentRegistration.Status.APPROVED,
-    ).select_related('team', 'team__captain_user').prefetch_related('team__participants')
+    ).select_related('team', 'team__captain_user').prefetch_related('team__participants', 'members')
     my_registration = next(
         (registration for registration in approved_registrations if user_has_registration_access(request.user, registration)),
         None,
@@ -1303,7 +1260,7 @@ def tournament_leaderboard(request, tournament_id):
     approved_registrations = TournamentRegistration.objects.filter(
         tournament=tournament,
         status=TournamentRegistration.Status.APPROVED,
-    ).select_related('team', 'team__captain_user').prefetch_related('team__participants')
+    ).select_related('team', 'team__captain_user').prefetch_related('team__participants', 'members')
     my_registration = next(
         (registration for registration in approved_registrations if user_has_registration_access(request.user, registration)),
         None,
@@ -1331,7 +1288,7 @@ def submit_solution(request, task_id):
     approved_registrations = TournamentRegistration.objects.filter(
         tournament=tournament,
         status=TournamentRegistration.Status.APPROVED,
-    ).select_related('team', 'team__captain_user').prefetch_related('team__participants')
+    ).select_related('team', 'team__captain_user').prefetch_related('team__participants', 'members')
     my_registration = next(
         (registration for registration in approved_registrations if user_has_registration_access(request.user, registration)),
         None,

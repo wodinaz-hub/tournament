@@ -77,7 +77,7 @@
                 {% if item.my_registration and item.my_registration.status == "approved" %}
                     <div class="message ok">Заявку схвалено. Команда допущена до турніру.</div>
                 {% elif item.my_registration and item.my_registration.status == "pending" %}
-                    <div class="message warn">Заявку подано. Очікується рішення організатора.</div>
+                    <div class="message warn">Заявку подано. Очікується рішення організатора. Завдання відкриються після схвалення заявки.</div>
                 {% elif item.my_registration and item.my_registration.status == "rejected" %}
                     <div class="message bad">Попередню заявку відхилено.</div>
                 {% endif %}

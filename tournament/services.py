@@ -1,113 +1,117 @@
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import Participant, Team, Tournament, TournamentRegistration
+from users.models import CustomUser
+
+from .models import RegistrationMember, Team, Tournament, TournamentRegistration
 
 
-class TeamRegistrationService:
+class RegistrationService:
+    @staticmethod
+    def _normalize_roster(roster: Iterable[Dict[str, Any]] | None) -> list[dict[str, str]]:
+        normalized = []
+        seen_emails = set()
+
+        for item in roster or []:
+            full_name = (item.get("full_name") or "").strip()
+            email = (item.get("email") or "").strip().lower()
+
+            if not full_name:
+                raise ValidationError("Participant full name is required.")
+            if not email:
+                raise ValidationError("Participant email is required.")
+            if email in seen_emails:
+                raise ValidationError("Participant emails must be unique within the registration.")
+
+            seen_emails.add(email)
+            normalized.append({
+                "full_name": full_name,
+                "email": email,
+            })
+
+        return normalized
+
     @staticmethod
     @transaction.atomic
-    def register_team(tournament_id: int, team_data: Dict[str, Any]) -> Team:
-        tournament = (
-            Tournament.objects.select_for_update()
-            .only(
-                "id",
-                "is_draft",
-                "registration_start",
-                "registration_end",
-            )
-            .get(id=tournament_id)
-        )
+    def submit_registration(
+        *,
+        tournament: Tournament,
+        team: Team,
+        registered_by: CustomUser,
+        form_answers: Dict[str, Any],
+        roster: Iterable[Dict[str, Any]] | None = None,
+    ) -> TournamentRegistration:
+        tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+        team = Team.objects.select_for_update().get(pk=team.pk)
 
         if tournament.is_draft or not tournament.is_registration_open:
             raise ValidationError("Tournament is not open for registration.")
 
-        name = (team_data.get("name") or "").strip()
-        captain_name = (team_data.get("captain_name") or "").strip()
-        captain_email_raw = (team_data.get("captain_email") or "").strip()
-        school = (team_data.get("school") or None) or None
-        telegram = (team_data.get("telegram") or None) or None
-        participants_data = team_data.get("participants") or []
-        registered_by = team_data.get("registered_by")
-        captain_user = team_data.get("captain_user") or registered_by
+        active_statuses = [
+            TournamentRegistration.Status.PENDING,
+            TournamentRegistration.Status.APPROVED,
+        ]
 
-        if not name:
-            raise ValidationError("Team name is required.")
-        if not captain_name:
-            raise ValidationError("Captain name is required.")
-        if not captain_email_raw:
-            raise ValidationError("Captain email is required.")
-        if registered_by is None:
-            raise ValidationError("registered_by is required.")
-        if captain_user is None:
-            raise ValidationError("captain_user is required.")
-        if len(participants_data) < 2:
-            raise ValidationError("At least two participants are required.")
+        if TournamentRegistration.objects.filter(
+            tournament=tournament,
+            team=team,
+            status__in=active_statuses,
+        ).exists():
+            raise ValidationError("Team already has an active registration for this tournament.")
+
         if (
             tournament.max_teams
             and TournamentRegistration.objects.filter(
-                tournament_id=tournament.id,
-                status__in=[
-                    TournamentRegistration.Status.PENDING,
-                    TournamentRegistration.Status.APPROVED,
-                ],
+                tournament=tournament,
+                status__in=active_statuses,
             ).count()
             >= tournament.max_teams
         ):
             raise ValidationError("Tournament team limit has been reached.")
 
-        captain_exists = TournamentRegistration.objects.filter(
-            tournament_id=tournament.id,
-            team__captain_email__iexact=captain_email_raw.lower(),
-            status__in=[
-                TournamentRegistration.Status.PENDING,
-                TournamentRegistration.Status.APPROVED,
-            ],
-        ).exists()
-        if captain_exists:
+        normalized_roster = RegistrationService._normalize_roster(roster)
+
+        members_count = 1 + len(normalized_roster) if normalized_roster else team.members_count
+        if (
+            tournament.min_team_members is not None
+            and members_count < tournament.min_team_members
+        ):
             raise ValidationError(
-                "A team with this captain email is already registered in this tournament."
+                f"У команді замало людей. Потрібно щонайменше: {tournament.min_team_members}."
+            )
+        if (
+            tournament.max_team_members is not None
+            and members_count > tournament.max_team_members
+        ):
+            raise ValidationError(
+                f"У команді забагато людей. Максимум дозволено: {tournament.max_team_members}."
             )
 
-        participant_emails = []
-        for participant in participants_data:
-            email = (participant.get("email") or "").strip()
-            full_name = (participant.get("full_name") or "").strip()
-            if not full_name:
-                raise ValidationError("Participant full name is required.")
-            if not email:
-                raise ValidationError("Participant email is required.")
-            participant_emails.append(email.lower())
+        TournamentRegistration.objects.filter(
+            tournament=tournament,
+            team=team,
+            status=TournamentRegistration.Status.REJECTED,
+        ).delete()
 
-        if len(participant_emails) != len(set(participant_emails)):
-            raise ValidationError("Participant emails must be unique within the team.")
-
-        team = Team.objects.create(
-            captain_user=captain_user,
-            name=name,
-            captain_name=captain_name,
-            captain_email=captain_email_raw,
-            school=school,
-            telegram=telegram,
-        )
-
-        TournamentRegistration.objects.create(
+        registration = TournamentRegistration.objects.create(
             tournament=tournament,
             team=team,
             registered_by=registered_by,
+            status=TournamentRegistration.Status.PENDING,
+            form_answers=form_answers,
         )
 
-        Participant.objects.bulk_create(
-            [
-                Participant(
-                    team=team,
-                    full_name=(participant["full_name"] or "").strip(),
-                    email=(participant["email"] or "").strip(),
+        if normalized_roster:
+            RegistrationMember.objects.bulk_create([
+                RegistrationMember(
+                    registration=registration,
+                    user=CustomUser.objects.filter(email__iexact=item["email"]).first(),
+                    full_name=item["full_name"],
+                    email=item["email"],
                 )
-                for participant in participants_data
-            ]
-        )
+                for item in normalized_roster
+            ])
 
-        return team
+        return registration

@@ -45,6 +45,55 @@
             flex-wrap: wrap;
             align-items: center;
         }
+        .nav-dropdown {
+            position: relative;
+        }
+        .nav-dropdown summary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 11px 16px;
+            border-radius: 12px;
+            font-weight: 700;
+            background: white;
+            color: #2563eb;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+            list-style: none;
+        }
+        .nav-dropdown summary::-webkit-details-marker {
+            display: none;
+        }
+        .nav-dropdown[open] summary {
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 240px;
+            display: grid;
+            gap: 8px;
+            padding: 12px;
+            border-radius: 16px;
+            background: white;
+            border: 1px solid #d9e2ef;
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
+            z-index: 20;
+        }
+        .dropdown-menu a {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 10px;
+            color: #1d4ed8;
+            background: #f8fbff;
+            border: 1px solid #dbe7f3;
+        }
+        .dropdown-menu a:hover {
+            background: #eef5ff;
+        }
         .button {
             background: #2563eb;
             color: white;
@@ -193,9 +242,19 @@
                     <div class="nav-links">
                         <a class="button-secondary" href="{% url 'home' %}">Головна</a>
                         {% if request.user.is_superuser or request.user.role == 'admin' %}
-                            <a class="button-secondary" href="{% url 'admin_dashboard' %}">Адмінка</a>
-                            <a class="button-secondary" href="{% url 'create_tournament' %}">Створити турнір</a>
-                            <a class="button-secondary" href="{% url 'create_user_by_admin' %}">Створити користувача</a>
+                            <details class="nav-dropdown">
+                                <summary>Керування</summary>
+                                <div class="dropdown-menu">
+                                    <a href="{% url 'admin_dashboard' %}#users">Користувачі</a>
+                                    <a href="{% url 'create_user_by_admin' %}">Створити користувача</a>
+                                    <a href="{% url 'admin_dashboard' %}#active-tournaments">Активні турніри</a>
+                                    <a href="{% url 'admin_dashboard' %}#inactive-tournaments">Неактивні турніри</a>
+                                    <a href="{% url 'create_tournament' %}">Створити турнір</a>
+                                    <a href="{% url 'admin_dashboard' %}#teams">Команди</a>
+                                    <a href="{% url 'admin_dashboard' %}#registrations">Заявки</a>
+                                    <a href="{% url 'admin_dashboard' %}#submissions">Роботи</a>
+                                </div>
+                            </details>
                         {% elif request.user.role == 'participant' or request.user.role == 'captain' %}
                             <a class="button-secondary" href="{% url 'profile' %}">Профіль</a>
                             <a class="button-secondary" href="{% url 'my_team' %}">Моя команда</a>

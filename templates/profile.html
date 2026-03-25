@@ -13,12 +13,20 @@
         .item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
         .meta { color: #555; font-size: 14px; line-height: 1.6; margin-top: 6px; }
         .action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 9px; text-decoration: none; color: white; background: #2563eb; font-size: 13px; min-height: 36px; line-height: 1.2; font-weight: 600; }
-        .btn-green { background: #16a34a; }
+        .btn, .btn-green, .btn-secondary {
+            display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px;
+            border-radius: 9px; text-decoration: none; font-size: 13px; min-height: 36px; line-height: 1.2; font-weight: 600;
+        }
+        .btn { color: white; background: #2563eb; }
+        .btn-green { color: white; background: #16a34a; }
+        .btn-secondary { color: #2563eb; background: #eef4ff; }
         .message { margin-top: 10px; color: #4b5563; }
         .message.ok { color: #15803d; }
         .message.warn { color: #92400e; }
         .message.bad { color: #b91c1c; }
+        .badge { display: inline-flex; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .participant { background: #dbeafe; color: #1d4ed8; }
+        .winner { background: #fef3c7; color: #92400e; }
     </style>
 </head>
 <body>
@@ -54,13 +62,13 @@
                     <div class="meta">Капітан: {{ team.captain_name }}</div>
                     <div class="action-row">
                         <a class="btn" href="{% url 'team_detail' team.id %}">Відкрити</a>
-                        <a class="btn btn-green" href="{% url 'team_results' team.id %}">Результати</a>
+                        <a class="btn-green" href="{% url 'team_results' team.id %}">Результати</a>
                     </div>
                 </div>
             {% endfor %}
         {% else %}
             <p>У вас ще немає команди.</p>
-            <a class="btn btn-green" href="{% url 'create_team' %}">Створити команду</a>
+            <a class="btn-green" href="{% url 'create_team' %}">Створити команду</a>
         {% endif %}
     </div>
 
@@ -84,15 +92,50 @@
                 <div class="action-row">
                     <a class="btn" href="{% url 'public_tournament_detail' item.tournament.id %}">Сторінка турніру</a>
                     {% if item.can_open_tasks %}
-                        <a class="btn btn-green" href="{% url 'tournament_tasks' item.tournament.id %}">Завдання</a>
+                        <a class="btn-green" href="{% url 'tournament_tasks' item.tournament.id %}">Завдання</a>
                     {% endif %}
                     {% if item.can_view_leaderboard %}
-                        <a class="btn btn-green" href="{% url 'tournament_leaderboard' item.tournament.id %}">Лідерборд</a>
+                        <a class="btn-green" href="{% url 'tournament_leaderboard' item.tournament.id %}">Лідерборд</a>
                     {% endif %}
                 </div>
             </div>
         {% empty %}
             <p>Доступних турнірів зараз немає.</p>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <h2>Мої сертифікати</h2>
+        {% for certificate in certificates %}
+            <div class="item">
+                <strong>{{ certificate.tournament.name }}</strong>
+                <div class="meta">
+                    Команда: {{ certificate.team.name|default:"-" }}<br>
+                    Дата видачі: {{ certificate.issued_at }}
+                </div>
+                <div class="action-row">
+                    <span class="badge {{ certificate.certificate_type }}">{{ certificate.get_certificate_type_display }}</span>
+                    <a class="btn-secondary" href="{% url 'download_certificate_pdf' certificate.id %}">Завантажити PDF</a>
+                </div>
+            </div>
+        {% empty %}
+            <p>Сертифікатів поки немає.</p>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <h2>Оголошення</h2>
+        {% for announcement in announcements %}
+            <div class="item">
+                <strong>{{ announcement.title }}</strong>
+                <div class="meta">
+                    {% if announcement.tournament %}Турнір: {{ announcement.tournament.name }}<br>{% endif %}
+                    Дата: {{ announcement.created_at }}
+                </div>
+                <p style="margin:10px 0 0; line-height:1.7;">{{ announcement.message }}</p>
+            </div>
+        {% empty %}
+            <p>Оголошень поки немає.</p>
         {% endfor %}
     </div>
 </div>

@@ -49,6 +49,12 @@ class Tournament(models.Model):
         related_name="jury_tournaments",
         verbose_name="Призначене журі",
     )
+    curator_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="curated_tournaments",
+        verbose_name="Призначені куратори",
+    )
 
     class Meta:
         ordering = ["-start_date", "name"]
@@ -412,3 +418,126 @@ class RegistrationMember(models.Model):
 
     def __str__(self):
         return f"{self.full_name} ({self.email})"
+
+
+class Announcement(models.Model):
+    title = models.CharField(max_length=255, verbose_name="Заголовок")
+    message = models.TextField(verbose_name="Текст оголошення")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="announcements_created",
+        verbose_name="Створено користувачем",
+    )
+    tournament = models.ForeignKey(
+        Tournament,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="announcements",
+        verbose_name="Турнір",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Дата створення")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Оголошення"
+        verbose_name_plural = "Оголошення"
+
+    def __str__(self):
+        return self.title
+
+
+class Certificate(models.Model):
+    class CertificateType(models.TextChoices):
+        PARTICIPANT = "participant", "Учасник"
+        WINNER = "winner", "Переможець"
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="certificates",
+        verbose_name="Турнір",
+    )
+    team = models.ForeignKey(
+        Team,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="certificates",
+        verbose_name="Команда",
+    )
+    certificate_type = models.CharField(
+        max_length=20,
+        choices=CertificateType.choices,
+        db_index=True,
+        verbose_name="Тип сертифіката",
+    )
+    recipient_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="certificates_received",
+        verbose_name="Користувач-отримувач",
+    )
+    recipient_name = models.CharField(max_length=255, verbose_name="Ім'я отримувача")
+    recipient_email = models.EmailField(verbose_name="Email отримувача")
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="certificates_issued",
+        verbose_name="Видав користувач",
+    )
+    issued_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Дата видачі")
+
+    class Meta:
+        ordering = ["-issued_at"]
+        verbose_name = "Сертифікат"
+        verbose_name_plural = "Сертифікати"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tournament", "certificate_type", "recipient_email"],
+                name="unique_certificate_per_tournament_type_email",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.get_certificate_type_display()}: {self.recipient_name}"
+
+
+class CertificateTemplate(models.Model):
+    tournament = models.ForeignKey(
+        Tournament,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="certificate_templates",
+        verbose_name="Турнір",
+    )
+    certificate_type = models.CharField(
+        max_length=20,
+        choices=Certificate.CertificateType.choices,
+        db_index=True,
+        verbose_name="Тип сертифіката",
+    )
+    background_image = models.ImageField(
+        upload_to="certificate_templates/",
+        verbose_name="Шаблон сертифіката",
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_certificate_templates",
+        verbose_name="Завантажив користувач",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Дата завантаження")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Шаблон сертифіката"
+        verbose_name_plural = "Шаблони сертифікатів"
+
+    def __str__(self):
+        scope = self.tournament.name if self.tournament_id else "Глобальний"
+        return f"{scope}: {self.get_certificate_type_display()}"

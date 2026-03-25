@@ -1,16 +1,24 @@
+import csv
+import io
+import os
+from datetime import timedelta
 from statistics import mean
 
+from PIL import Image, ImageDraw, ImageFont
+from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from django.http import HttpResponseNotAllowed
+from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from tournament.forms import (
+    AnnouncementForm,
+    CertificateTemplateForm,
     EvaluationForm,
     ParticipantForm,
     SubmissionForm,
@@ -20,6 +28,9 @@ from tournament.forms import (
     TournamentRegistrationForm,
 )
 from tournament.models import (
+    Announcement,
+    Certificate,
+    CertificateTemplate,
     Evaluation,
     JuryAssignment,
     Participant,
@@ -48,6 +59,10 @@ def is_organizer_user(user):
     return user.role == 'organizer'
 
 
+def is_curator_user(user):
+    return user.role == 'curator'
+
+
 def can_manage_users(user):
     return is_admin_user(user)
 
@@ -60,12 +75,28 @@ def can_manage_tournaments(user):
     return is_admin_user(user) or is_organizer_user(user)
 
 
+def can_review_registrations(user):
+    return is_admin_user(user) or is_organizer_user(user) or is_curator_user(user)
+
+
 def can_manage_tournament_instance(user, tournament):
     return is_admin_user(user) or tournament.created_by_id == user.id
 
 
 def can_manage_registration_instance(user, registration):
-    return is_admin_user(user) or registration.tournament.created_by_id == user.id
+    return (
+        is_admin_user(user)
+        or registration.tournament.created_by_id == user.id
+        or registration.tournament.curator_users.filter(id=user.id).exists()
+    )
+
+
+def can_view_curated_tournament(user, tournament):
+    return (
+        is_admin_user(user)
+        or tournament.created_by_id == user.id
+        or tournament.curator_users.filter(id=user.id).exists()
+    )
 
 
 def get_dashboard_url_for_user(user):
@@ -73,16 +104,123 @@ def get_dashboard_url_for_user(user):
         return reverse('admin_users')
     if is_organizer_user(user):
         return reverse('organizer_dashboard')
+    if is_curator_user(user):
+        return reverse('curator_dashboard')
     if user.role == 'jury':
         return reverse('jury_dashboard')
     return reverse('home')
 
 
 def get_available_admin_roles(user):
-    roles = {'participant', 'captain', 'jury', 'organizer'}
+    roles = {'participant', 'captain', 'jury', 'curator', 'organizer'}
     if can_create_admins(user):
         roles.add('admin')
     return roles
+
+
+def can_export_tournament_results(user, tournament):
+    return (
+        is_admin_user(user)
+        or tournament.created_by_id == user.id
+        or tournament.curator_users.filter(id=user.id).exists()
+        or tournament.jury_users.filter(id=user.id).exists()
+    )
+
+
+def serialize_leaderboard_rows(leaderboard, my_team=None):
+    my_team_id = my_team.id if my_team is not None else None
+    return [
+        {
+            'place': row['place'],
+            'team_id': row['team'].id,
+            'team_name': row['team'].name,
+            'captain_name': row['team'].captain_name,
+            'overall_average': row['overall_average'],
+            'best_score': row['best_score'],
+            'scored_tasks': row['scored_tasks'],
+            'submitted_tasks': row['submitted_tasks'],
+            'is_my_team': my_team_id == row['team'].id,
+        }
+        for row in leaderboard
+    ]
+
+
+def get_certificate_template_for(tournament, certificate_type):
+    tournament_template = CertificateTemplate.objects.filter(
+        tournament=tournament,
+        certificate_type=certificate_type,
+    ).order_by('-created_at').first()
+    if tournament_template is not None:
+        return tournament_template
+    return CertificateTemplate.objects.filter(
+        tournament__isnull=True,
+        certificate_type=certificate_type,
+    ).order_by('-created_at').first()
+
+
+def load_certificate_font(size):
+    font_candidates = [
+        os.path.join(settings.BASE_DIR, 'static', 'fonts', 'DejaVuSans.ttf'),
+        r'C:\Windows\Fonts\arial.ttf',
+        r'C:\Windows\Fonts\calibri.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
+    ]
+    for font_path in font_candidates:
+        if font_path and os.path.exists(font_path):
+            try:
+                return ImageFont.truetype(font_path, size=size)
+            except OSError:
+                continue
+    return ImageFont.load_default()
+
+
+def build_certificate_pdf_response(certificate):
+    template = get_certificate_template_for(
+        tournament=certificate.tournament,
+        certificate_type=certificate.certificate_type,
+    )
+    if template is None or not template.background_image:
+        raise ValidationError('Для цього типу сертифіката ще не завантажено шаблон.')
+
+    with Image.open(template.background_image.path) as source_image:
+        image = source_image.convert('RGB')
+
+    width, height = image.size
+    draw = ImageDraw.Draw(image)
+    title_font = load_certificate_font(max(28, width // 24))
+    name_font = load_certificate_font(max(34, width // 18))
+    meta_font = load_certificate_font(max(18, width // 42))
+    fill = '#1f2937'
+    center_x = width / 2
+
+    title = (
+        'Сертифікат переможця'
+        if certificate.certificate_type == Certificate.CertificateType.WINNER
+        else 'Сертифікат учасника'
+    )
+    subtitle = certificate.tournament.name
+    footer_parts = []
+    if certificate.team_id:
+        footer_parts.append(f'Команда: {certificate.team.name}')
+    footer_parts.append(f'Дата: {timezone.localtime(certificate.issued_at).strftime("%d.%m.%Y")}')
+    footer = ' | '.join(footer_parts)
+
+    for text, font, y in [
+        (title, title_font, int(height * 0.23)),
+        (certificate.recipient_name, name_font, int(height * 0.43)),
+        (subtitle, meta_font, int(height * 0.60)),
+        (footer, meta_font, int(height * 0.72)),
+    ]:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        draw.text(((center_x - text_width / 2), y), text, font=font, fill=fill)
+
+    buffer = io.BytesIO()
+    image.save(buffer, 'PDF', resolution=100.0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="certificate-{certificate.id}.pdf"'
+    return response
 
 
 def build_tournament_leaderboard(tournament):
@@ -164,6 +302,17 @@ def is_tournament_edit_locked(tournament):
         and tournament.registration_end is not None
         and tournament.registration_end <= timezone.now()
     )
+
+
+def is_team_roster_locked(team):
+    return team.registrations.filter(
+        status__in=[
+            TournamentRegistration.Status.PENDING,
+            TournamentRegistration.Status.APPROVED,
+        ],
+        tournament__registration_end__isnull=False,
+        tournament__registration_end__lte=timezone.now(),
+    ).exists()
 
 
 def user_has_registration_access(user, registration):
@@ -307,8 +456,106 @@ def build_public_tournament_rows():
     return rows
 
 
+def build_public_announcements():
+    return Announcement.objects.select_related('created_by', 'tournament').order_by('-created_at')[:5]
+
+
+def build_user_announcements_queryset(user):
+    return Announcement.objects.select_related('created_by', 'tournament').order_by('-created_at')
+
+
+def build_user_certificates_queryset(user):
+    return Certificate.objects.filter(
+        Q(recipient_user=user) | Q(recipient_email__iexact=user.email)
+    ).select_related('tournament', 'team', 'issued_by', 'recipient_user').distinct().order_by('-issued_at')
+
+
+def build_notification_nav_context(user):
+    if not getattr(user, 'is_authenticated', False):
+        return {
+            'has_unread_announcements': False,
+            'has_unread_certificates': False,
+            'unread_announcements_count': 0,
+            'unread_certificates_count': 0,
+        }
+
+    announcements_seen_at = user.announcements_seen_at
+    certificates_seen_at = user.certificates_seen_at
+
+    announcements_qs = build_user_announcements_queryset(user)
+    certificates_qs = build_user_certificates_queryset(user)
+
+    unread_announcements_qs = announcements_qs
+    if announcements_seen_at is not None:
+        unread_announcements_qs = unread_announcements_qs.filter(created_at__gt=announcements_seen_at)
+
+    unread_certificates_qs = certificates_qs
+    if certificates_seen_at is not None:
+        unread_certificates_qs = unread_certificates_qs.filter(issued_at__gt=certificates_seen_at)
+
+    return {
+        'has_unread_announcements': unread_announcements_qs.exists(),
+        'has_unread_certificates': unread_certificates_qs.exists(),
+        'unread_announcements_count': unread_announcements_qs.count(),
+        'unread_certificates_count': unread_certificates_qs.count(),
+    }
+
+
+def collect_registration_recipients(registration):
+    recipients = []
+    seen_emails = set()
+
+    def add_recipient(*, user=None, name='', email=''):
+        normalized_email = (email or '').strip().lower()
+        if not normalized_email or normalized_email in seen_emails:
+            return
+        seen_emails.add(normalized_email)
+        recipients.append({
+            'user': user,
+            'name': (name or normalized_email).strip(),
+            'email': normalized_email,
+        })
+
+    add_recipient(
+        user=registration.team.captain_user,
+        name=registration.team.captain_name,
+        email=registration.team.captain_email,
+    )
+
+    for member in registration.members.all():
+        add_recipient(user=member.user, name=member.full_name, email=member.email)
+
+    for participant in registration.team.participants.all():
+        linked_user = CustomUser.objects.filter(email__iexact=participant.email).first()
+        add_recipient(user=linked_user, name=participant.full_name, email=participant.email)
+
+    return recipients
+
+
+def issue_certificates_for_tournament(*, tournament, issued_by, certificate_type, registrations):
+    created_count = 0
+    for registration in registrations:
+        for recipient in collect_registration_recipients(registration):
+            _, created = Certificate.objects.get_or_create(
+                tournament=tournament,
+                certificate_type=certificate_type,
+                recipient_email=recipient['email'],
+                defaults={
+                    'team': registration.team,
+                    'recipient_user': recipient['user'],
+                    'recipient_name': recipient['name'],
+                    'issued_by': issued_by,
+                },
+            )
+            if created:
+                created_count += 1
+    return created_count
+
+
 def home(request):
     tournament_rows = build_public_tournament_rows()
+    announcements = build_public_announcements()
+    notification_context = build_notification_nav_context(request.user)
     featured_tournaments = [row for row in tournament_rows if row['tournament'].is_registration_open][:3]
     active_tournaments = [row for row in tournament_rows if row['tournament'].is_running][:3]
     finished_tournaments = [row for row in tournament_rows if row['tournament'].is_finished][:3]
@@ -331,6 +578,32 @@ def home(request):
         'active_tournaments': active_tournaments,
         'finished_tournaments': finished_tournaments,
         'news_rows': news_rows,
+        'announcements': announcements,
+        **notification_context,
+    })
+
+
+@login_required
+def messages_view(request):
+    announcements = build_user_announcements_queryset(request.user)
+    now = timezone.now()
+    request.user.announcements_seen_at = now
+    request.user.save(update_fields=['announcements_seen_at'])
+    return render(request, 'messages.html', {
+        'announcements': announcements,
+        **build_notification_nav_context(request.user),
+    })
+
+
+@login_required
+def certificates_view(request):
+    certificates = build_user_certificates_queryset(request.user)
+    now = timezone.now()
+    request.user.certificates_seen_at = now
+    request.user.save(update_fields=['certificates_seen_at'])
+    return render(request, 'certificates.html', {
+        'certificates': certificates,
+        **build_notification_nav_context(request.user),
     })
 
 
@@ -391,6 +664,8 @@ def redirect_by_role(request):
 
     if is_admin_user(user) or is_organizer_user(user):
         return redirect('home')
+    if is_curator_user(user):
+        return redirect('curator_dashboard')
     if user.role == 'jury':
         return redirect('jury_dashboard')
     return redirect('home')
@@ -513,17 +788,147 @@ def admin_submissions(request):
 
 
 @login_required
+def admin_announcements(request):
+    if not is_admin_user(request.user):
+        return redirect('redirect_by_role')
+
+    tournament_queryset = Tournament.objects.order_by('-start_date', 'name')
+    if request.method == 'POST':
+        form = AnnouncementForm(request.POST, tournament_queryset=tournament_queryset)
+        if form.is_valid():
+            announcement = form.save(commit=False)
+            announcement.created_by = request.user
+            announcement.save()
+            return redirect('admin_announcements')
+    else:
+        form = AnnouncementForm(tournament_queryset=tournament_queryset)
+
+    announcements = Announcement.objects.select_related('created_by', 'tournament').all()
+    return render(request, 'admin_announcements.html', {
+        'form': form,
+        'announcements': announcements,
+    })
+
+
+@login_required
+def admin_certificates(request):
+    if not is_admin_user(request.user):
+        return redirect('redirect_by_role')
+
+    tournament_queryset = Tournament.objects.order_by('-start_date', 'name')
+    if request.method == 'POST':
+        template_form = CertificateTemplateForm(
+            request.POST,
+            request.FILES,
+            tournament_queryset=tournament_queryset,
+        )
+        if template_form.is_valid():
+            template = template_form.save(commit=False)
+            template.uploaded_by = request.user
+            template.save()
+            return redirect('admin_certificates')
+    else:
+        template_form = CertificateTemplateForm(tournament_queryset=tournament_queryset)
+
+    finished_tournaments = Tournament.objects.filter(
+        is_draft=False,
+        end_date__isnull=False,
+        end_date__lt=timezone.now(),
+    ).prefetch_related(
+        'registrations__team',
+        'registrations__members',
+        'registrations__team__participants',
+    ).order_by('-end_date', 'name')
+    certificates = Certificate.objects.select_related(
+        'tournament',
+        'team',
+        'issued_by',
+        'recipient_user',
+    ).all()
+    certificate_templates = CertificateTemplate.objects.select_related(
+        'tournament',
+        'uploaded_by',
+    ).all()
+    return render(request, 'admin_certificates.html', {
+        'finished_tournaments': finished_tournaments,
+        'certificates': certificates,
+        'certificate_templates': certificate_templates,
+        'template_form': template_form,
+    })
+
+
+@login_required
 def organizer_dashboard(request):
     if not is_organizer_user(request.user):
         return redirect('redirect_by_role')
 
-    tournaments = Tournament.objects.filter(created_by=request.user).prefetch_related('tasks', 'jury_users')
+    tournaments = Tournament.objects.filter(created_by=request.user).prefetch_related(
+        'tasks',
+        'jury_users',
+        'curator_users',
+    )
     registrations = TournamentRegistration.objects.filter(
         tournament__created_by=request.user,
-    ).select_related('tournament', 'team', 'registered_by')
+    ).select_related('tournament', 'team', 'registered_by').prefetch_related('members')
     return render(request, 'organizer_dashboard.html', {
         'tournaments': tournaments.order_by('-start_date', 'name'),
         'registrations': registrations.order_by('-created_at'),
+        **build_notification_nav_context(request.user),
+    })
+
+
+@login_required
+def curator_dashboard(request):
+    if not is_curator_user(request.user) and not request.user.is_superuser:
+        return redirect('redirect_by_role')
+
+    tournaments = Tournament.objects.prefetch_related(
+        'tasks',
+        'jury_users',
+        'curator_users',
+        'registrations__team',
+        'registrations__members',
+    )
+    if not request.user.is_superuser:
+        tournaments = tournaments.filter(curator_users=request.user)
+    tournaments = tournaments.distinct().order_by('-start_date', 'name')
+    return render(request, 'curator_dashboard.html', {
+        'tournaments': tournaments,
+        **build_notification_nav_context(request.user),
+    })
+
+
+@login_required
+def curator_tournament_detail(request, tournament_id):
+    if not is_curator_user(request.user) and not request.user.is_superuser:
+        return redirect('redirect_by_role')
+
+    tournament = get_object_or_404(
+        Tournament.objects.prefetch_related(
+            'tasks',
+            'jury_users',
+            'curator_users',
+            'registrations__team',
+            'registrations__members',
+        ),
+        id=tournament_id,
+    )
+    if not can_view_curated_tournament(request.user, tournament):
+        return redirect('redirect_by_role')
+
+    registrations = TournamentRegistration.objects.filter(
+        tournament=tournament,
+    ).select_related('team', 'registered_by').prefetch_related('members').order_by('-created_at')
+    submissions = Submission.objects.filter(
+        task__tournament=tournament,
+    ).select_related('team', 'task').order_by('team__name', 'task__title')
+    leaderboard = build_tournament_leaderboard(tournament)
+    return render(request, 'curator_tournament_detail.html', {
+        'tournament': tournament,
+        'registrations': registrations,
+        'submissions': submissions,
+        'leaderboard': leaderboard[:10],
+        **build_notification_nav_context(request.user),
     })
 
 
@@ -606,7 +1011,7 @@ def delete_user(request, user_id):
 
 @login_required
 def approve_registration(request, registration_id):
-    if not can_manage_tournaments(request.user):
+    if not can_review_registrations(request.user):
         return redirect('redirect_by_role')
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
@@ -622,7 +1027,7 @@ def approve_registration(request, registration_id):
 
 @login_required
 def reject_registration(request, registration_id):
-    if not can_manage_tournaments(request.user):
+    if not can_review_registrations(request.user):
         return redirect('redirect_by_role')
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
@@ -714,6 +1119,173 @@ def delete_tournament(request, tournament_id):
     tournament.delete()
     fallback = reverse('admin_active_tournaments') if is_admin_user(request.user) else get_dashboard_url_for_user(request.user)
     return redirect(get_post_redirect(request, fallback))
+
+
+@login_required
+def start_tournament_now(request, tournament_id):
+    if not can_manage_tournaments(request.user):
+        return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return redirect(get_dashboard_url_for_user(request.user))
+
+    tournament = get_object_or_404(Tournament, id=tournament_id)
+    if not can_manage_tournament_instance(request.user, tournament):
+        return redirect('redirect_by_role')
+
+    now = timezone.now()
+    tournament.is_draft = False
+    tournament.registration_start = tournament.registration_start or (now - timedelta(days=1))
+    if tournament.registration_end is None or tournament.registration_end > now:
+        tournament.registration_end = now
+    tournament.start_date = now
+    if tournament.end_date is None or tournament.end_date <= now:
+        tournament.end_date = now + timedelta(days=1)
+    tournament.save(update_fields=[
+        'is_draft',
+        'registration_start',
+        'registration_end',
+        'start_date',
+        'end_date',
+    ])
+    return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
+
+
+@login_required
+def finish_tournament_now(request, tournament_id):
+    if not can_manage_tournaments(request.user):
+        return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return redirect(get_dashboard_url_for_user(request.user))
+
+    tournament = get_object_or_404(Tournament, id=tournament_id)
+    if not can_manage_tournament_instance(request.user, tournament):
+        return redirect('redirect_by_role')
+
+    now = timezone.now()
+    tournament.is_draft = False
+    tournament.registration_start = tournament.registration_start or (now - timedelta(days=1))
+    tournament.registration_end = now
+    tournament.start_date = tournament.start_date or (now - timedelta(hours=1))
+    tournament.end_date = now
+    tournament.save(update_fields=[
+        'is_draft',
+        'registration_start',
+        'registration_end',
+        'start_date',
+        'end_date',
+    ])
+    return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
+
+
+@login_required
+def issue_participant_certificates(request, tournament_id):
+    if not is_admin_user(request.user):
+        return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return redirect('admin_certificates')
+
+    tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
+    registrations = TournamentRegistration.objects.filter(
+        tournament=tournament,
+        status=TournamentRegistration.Status.APPROVED,
+    ).select_related('team', 'team__captain_user').prefetch_related('members', 'team__participants')
+    issue_certificates_for_tournament(
+        tournament=tournament,
+        issued_by=request.user,
+        certificate_type=Certificate.CertificateType.PARTICIPANT,
+        registrations=registrations,
+    )
+    return redirect(get_post_redirect(request, reverse('admin_certificates')))
+
+
+@login_required
+def issue_winner_certificates(request, tournament_id):
+    if not is_admin_user(request.user):
+        return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return redirect('admin_certificates')
+
+    tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
+    leaderboard = build_tournament_leaderboard(tournament)
+    if leaderboard:
+        winner_team = leaderboard[0]['team']
+        registrations = TournamentRegistration.objects.filter(
+            tournament=tournament,
+            team=winner_team,
+            status=TournamentRegistration.Status.APPROVED,
+        ).select_related('team', 'team__captain_user').prefetch_related('members', 'team__participants')
+        issue_certificates_for_tournament(
+            tournament=tournament,
+            issued_by=request.user,
+            certificate_type=Certificate.CertificateType.WINNER,
+            registrations=registrations,
+        )
+    return redirect(get_post_redirect(request, reverse('admin_certificates')))
+
+
+@login_required
+def download_certificate_pdf(request, certificate_id):
+    certificate = get_object_or_404(
+        Certificate.objects.select_related(
+            'tournament',
+            'team',
+            'recipient_user',
+            'issued_by',
+        ),
+        id=certificate_id,
+    )
+    can_download = (
+        is_admin_user(request.user)
+        or certificate.tournament.created_by_id == request.user.id
+        or certificate.tournament.curator_users.filter(id=request.user.id).exists()
+        or certificate.issued_by_id == request.user.id
+        or certificate.recipient_user_id == request.user.id
+        or certificate.recipient_email.lower() == (request.user.email or '').lower()
+    )
+    if not can_download:
+        return redirect('redirect_by_role')
+
+    try:
+        return build_certificate_pdf_response(certificate)
+    except ValidationError:
+        fallback = reverse('admin_certificates') if is_admin_user(request.user) else reverse('profile')
+        return redirect(fallback)
+
+
+@login_required
+def export_tournament_results_csv(request, tournament_id):
+    tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
+    if not can_export_tournament_results(request.user, tournament):
+        return redirect('redirect_by_role')
+
+    leaderboard = build_tournament_leaderboard(tournament)
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = (
+        f'attachment; filename="tournament-results-{tournament.id}.csv"'
+    )
+    response.write('\ufeff')
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Місце',
+        'Команда',
+        'Капітан',
+        'Середній бал',
+        'Кращий бал',
+        'Оцінених задач',
+        'Поданих робіт',
+    ])
+    for row in leaderboard:
+        writer.writerow([
+            row['place'],
+            row['team'].name,
+            row['team'].captain_name,
+            '' if row['overall_average'] is None else f"{row['overall_average']:.1f}",
+            '' if row['best_score'] is None else f"{row['best_score']:.1f}",
+            row['scored_tasks'],
+            row['submitted_tasks'],
+        ])
+    return response
 
 
 @login_required
@@ -817,7 +1389,10 @@ def jury_dashboard(request):
             'submissions_count': submissions.count(),
         })
 
-    return render(request, 'jury_dashboard.html', {'tournament_rows': tournament_rows})
+    return render(request, 'jury_dashboard.html', {
+        'tournament_rows': tournament_rows,
+        **build_notification_nav_context(request.user),
+    })
 
 
 @login_required
@@ -861,6 +1436,7 @@ def jury_tournament_detail(request, tournament_id):
         'tournament': tournament,
         'pending_team_rows': list(pending_team_map.values()),
         'evaluated_team_rows': list(evaluated_team_map.values()),
+        **build_notification_nav_context(request.user),
     })
 
 
@@ -969,10 +1545,16 @@ def profile_view(request):
             ),
         })
 
+    announcements = build_public_announcements()
+    certificates = build_user_certificates_queryset(request.user)
+
     return render(request, 'profile.html', {
         'profile_user': request.user,
         'my_teams': my_teams,
         'tournaments_with_state': tournaments_with_state,
+        'announcements': announcements,
+        'certificates': certificates,
+        **build_notification_nav_context(request.user),
     })
 
 
@@ -1088,18 +1670,26 @@ def team_detail(request, team_id):
         team = get_object_or_404(team_queryset, id=team_id, participants__email=request.user.email)
 
     submissions = team.submissions.select_related('task', 'task__tournament').all()
+    roster_locked = is_team_roster_locked(team) and not request.user.is_superuser
     return render(request, 'team_detail.html', {
         'team': team,
         'participants_count': team.participants.count(),
         'submissions': submissions,
         'participant_form': ParticipantForm(),
         'can_manage_team': request.user.is_superuser or team.captain_user_id == request.user.id,
-        'can_edit_team': request.user.is_superuser or team.captain_user_id == request.user.id,
+        'can_manage_roster': request.user.is_superuser or (
+            team.captain_user_id == request.user.id and not roster_locked
+        ),
+        'can_edit_team': request.user.is_superuser or (
+            team.captain_user_id == request.user.id and not roster_locked
+        ),
         'can_leave_team': (
             not request.user.is_superuser
             and team.captain_user_id != request.user.id
             and team.participants.filter(email=request.user.email).exists()
+            and not roster_locked
         ),
+        'roster_locked': roster_locked,
     })
 
 
@@ -1109,6 +1699,8 @@ def edit_team(request, team_id):
     if not request.user.is_superuser:
         team_lookup['captain_user'] = request.user
     team = get_object_or_404(Team, **team_lookup)
+    if is_team_roster_locked(team) and not request.user.is_superuser:
+        return redirect('team_detail', team_id=team.id)
 
     if request.method == 'POST':
         form = TeamForm(request.POST, instance=team)
@@ -1136,15 +1728,21 @@ def team_participants(request, team_id):
         team = get_object_or_404(team_queryset, id=team_id, participants__email=request.user.email)
 
     participants = team.participants.all().order_by('full_name')
+    roster_locked = is_team_roster_locked(team) and not request.user.is_superuser
     return render(request, 'team_participants.html', {
         'team': team,
         'participants': participants,
         'can_manage_team': request.user.is_superuser or team.captain_user_id == request.user.id,
+        'can_manage_roster': request.user.is_superuser or (
+            team.captain_user_id == request.user.id and not roster_locked
+        ),
         'can_leave_team': (
             not request.user.is_superuser
             and team.captain_user_id != request.user.id
             and team.participants.filter(email=request.user.email).exists()
+            and not roster_locked
         ),
+        'roster_locked': roster_locked,
     })
 
 
@@ -1157,6 +1755,8 @@ def add_participant(request, team_id):
     if not request.user.is_superuser:
         team_lookup['captain_user'] = request.user
     team = get_object_or_404(Team, **team_lookup)
+    if is_team_roster_locked(team) and not request.user.is_superuser:
+        return redirect('team_detail', team_id=team.id)
 
     if request.method == 'POST':
         form = ParticipantForm(request.POST)
@@ -1180,6 +1780,8 @@ def delete_participant(request, team_id, participant_id):
     if not request.user.is_superuser:
         team_lookup['captain_user'] = request.user
     team = get_object_or_404(Team, **team_lookup)
+    if is_team_roster_locked(team) and not request.user.is_superuser:
+        return redirect('team_detail', team_id=team.id)
     participant = get_object_or_404(Participant, id=participant_id, team=team)
 
     if request.method == 'POST':
@@ -1196,6 +1798,8 @@ def delete_team(request, team_id):
     if not request.user.is_superuser:
         team_lookup['captain_user'] = request.user
     team = get_object_or_404(Team, **team_lookup)
+    if is_team_roster_locked(team) and not request.user.is_superuser:
+        return redirect('team_detail', team_id=team.id)
 
     if request.method == 'POST':
         team.delete()
@@ -1210,6 +1814,8 @@ def leave_team(request, team_id):
         return redirect('redirect_by_role')
 
     team = get_object_or_404(Team, id=team_id)
+    if is_team_roster_locked(team) and not request.user.is_superuser:
+        return redirect('team_detail', team_id=team.id)
     participant = get_object_or_404(Participant, team=team, email=request.user.email)
 
     if request.method == 'POST':
@@ -1266,11 +1872,18 @@ def tournament_leaderboard(request, tournament_id):
 
     leaderboard = build_tournament_leaderboard(tournament)
     my_team = my_registration.team if my_registration is not None else None
+    if request.GET.get('format') == 'json':
+        return JsonResponse({
+            'tournament': tournament.name,
+            'updated_at': timezone.localtime(timezone.now()).strftime('%H:%M:%S'),
+            'rows': serialize_leaderboard_rows(leaderboard, my_team=my_team),
+        })
 
     return render(request, 'tournament_leaderboard.html', {
         'tournament': tournament,
         'leaderboard': leaderboard,
         'my_team': my_team,
+        'can_export_results': can_export_tournament_results(request.user, tournament),
     })
 
 

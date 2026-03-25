@@ -1,11 +1,29 @@
+import shutil
 from datetime import timedelta
+from io import BytesIO
+from pathlib import Path
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
-from tournament.models import Evaluation, Participant, Submission, Task, Team, Tournament, TournamentRegistration
+from tournament.models import (
+    Announcement,
+    Certificate,
+    CertificateTemplate,
+    Evaluation,
+    Participant,
+    RegistrationMember,
+    Submission,
+    Task,
+    Team,
+    Tournament,
+    TournamentRegistration,
+)
 
 
 User = get_user_model()
@@ -13,6 +31,12 @@ User = get_user_model()
 
 class TournamentPlatformViewTests(TestCase):
     def setUp(self):
+        media_base_dir = Path(__file__).resolve().parents[1] / "test_media_root"
+        media_base_dir.mkdir(exist_ok=True)
+        self.temp_media_dir = media_base_dir / f"tournament-media-{uuid4().hex}"
+        self.temp_media_dir.mkdir(parents=True, exist_ok=True)
+        self.media_override = override_settings(MEDIA_ROOT=self.temp_media_dir)
+        self.media_override.enable()
         self.captain = User.objects.create_user(
             username="captain",
             password="secret123",
@@ -46,7 +70,24 @@ class TournamentPlatformViewTests(TestCase):
             is_approved=True,
             email="organizer@example.com",
         )
+        self.curator_user = User.objects.create_user(
+            username="curator",
+            password="secret123",
+            role="curator",
+            is_approved=True,
+            email="curator@example.com",
+        )
         self.client.force_login(self.captain)
+
+    def tearDown(self):
+        self.media_override.disable()
+        shutil.rmtree(self.temp_media_dir, ignore_errors=True)
+        super().tearDown()
+
+    def make_test_image_upload(self, name="template.png"):
+        buffer = BytesIO()
+        Image.new("RGB", (1400, 1000), "white").save(buffer, format="PNG")
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
 
     def create_tournament(self, **overrides):
         now = timezone.now()
@@ -251,6 +292,282 @@ class TournamentPlatformViewTests(TestCase):
         response = self.client.get(reverse("organizer_dashboard"))
 
         self.assertEqual(response.status_code, 200)
+
+    def test_admin_can_assign_curator_role(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("update_user_role", args=[self.participant_user.id]),
+            {
+                "role": "curator",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_users"))
+        self.participant_user.refresh_from_db()
+        self.assertEqual(self.participant_user.role, "curator")
+
+    def test_curator_can_open_assigned_tournament(self):
+        tournament = self.create_tournament()
+        tournament.curator_users.add(self.curator_user)
+        self.client.force_login(self.curator_user)
+
+        response = self.client.get(reverse("curator_tournament_detail", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, tournament.name)
+
+    def test_curator_can_approve_registration_for_assigned_tournament(self):
+        tournament = self.create_tournament()
+        tournament.curator_users.add(self.curator_user)
+        team = Team.objects.create(
+            name="Pending Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        registration = TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.PENDING,
+        )
+        self.client.force_login(self.curator_user)
+
+        response = self.client.post(reverse("approve_registration", args=[registration.id]))
+
+        self.assertRedirects(response, reverse("curator_dashboard"))
+        registration.refresh_from_db()
+        self.assertEqual(registration.status, TournamentRegistration.Status.APPROVED)
+
+    def test_admin_can_create_announcement(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("admin_announcements"),
+            {
+                "title": "System update",
+                "message": "Platform maintenance tonight.",
+                "tournament": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_announcements"))
+        self.assertTrue(Announcement.objects.filter(title="System update").exists())
+
+    def test_admin_can_issue_participant_certificates(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(days=2),
+            end_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(days=3),
+        )
+        team = Team.objects.create(
+            name="Cert Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        registration = TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        RegistrationMember.objects.create(
+            registration=registration,
+            user=self.participant_user,
+            full_name="Member",
+            email=self.participant_user.email,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(reverse("issue_participant_certificates", args=[tournament.id]))
+
+        self.assertRedirects(response, reverse("admin_certificates"))
+        self.assertTrue(
+            Certificate.objects.filter(
+                tournament=tournament,
+                certificate_type=Certificate.CertificateType.PARTICIPANT,
+                recipient_email="captain@example.com",
+            ).exists()
+        )
+        self.assertTrue(
+            Certificate.objects.filter(
+                tournament=tournament,
+                certificate_type=Certificate.CertificateType.PARTICIPANT,
+                recipient_email=self.participant_user.email,
+            ).exists()
+        )
+
+    def test_admin_can_upload_certificate_template_and_download_pdf(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(days=2),
+            end_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(days=3),
+        )
+        team = Team.objects.create(
+            name="Template Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        certificate = Certificate.objects.create(
+            tournament=tournament,
+            team=team,
+            certificate_type=Certificate.CertificateType.PARTICIPANT,
+            recipient_user=self.captain,
+            recipient_name="Captain",
+            recipient_email="captain@example.com",
+            issued_by=self.admin_user,
+        )
+        self.client.force_login(self.admin_user)
+
+        upload_response = self.client.post(
+            reverse("admin_certificates"),
+            {
+                "tournament": tournament.id,
+                "certificate_type": Certificate.CertificateType.PARTICIPANT,
+                "background_image": self.make_test_image_upload(),
+            },
+        )
+
+        self.assertRedirects(upload_response, reverse("admin_certificates"))
+        self.assertTrue(
+            CertificateTemplate.objects.filter(
+                tournament=tournament,
+                certificate_type=Certificate.CertificateType.PARTICIPANT,
+            ).exists()
+        )
+
+        download_response = self.client.get(reverse("download_certificate_pdf", args=[certificate.id]))
+
+        self.assertEqual(download_response.status_code, 200)
+        self.assertEqual(download_response["Content-Type"], "application/pdf")
+        self.assertIn("attachment;", download_response["Content-Disposition"])
+
+    def test_admin_can_export_results_csv(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(hours=1),
+            end_date=timezone.now() + timedelta(hours=3),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        task = Task.objects.create(
+            tournament=tournament,
+            title="CSV task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        team = Team.objects.create(
+            name="CSV Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        submission = Submission.objects.create(
+            team=team,
+            task=task,
+            github_link="https://github.com/example/csv",
+            video_link="https://example.com/csv",
+        )
+        self.client.force_login(self.jury_user)
+        self.client.post(
+            reverse("submit_evaluation", args=[submission.id]),
+            {
+                f"eval-{submission.id}-score_backend": 95,
+                f"eval-{submission.id}-score_frontend": 90,
+                f"eval-{submission.id}-score_functionality": 85,
+                f"eval-{submission.id}-score_ux": 80,
+                f"eval-{submission.id}-comment": "CSV export",
+            },
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("export_tournament_results_csv", args=[tournament.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("CSV Team", response.content.decode("utf-8-sig"))
+
+    def test_leaderboard_json_endpoint_returns_live_rows(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(hours=1),
+            end_date=timezone.now() + timedelta(hours=3),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Live task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        team = Team.objects.create(
+            name="Live Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        submission = Submission.objects.create(
+            team=team,
+            task=task,
+            github_link="https://github.com/example/live",
+            video_link="https://example.com/live",
+        )
+        self.client.force_login(self.jury_user)
+        self.client.post(
+            reverse("submit_evaluation", args=[submission.id]),
+            {
+                f"eval-{submission.id}-score_backend": 88,
+                f"eval-{submission.id}-score_frontend": 86,
+                f"eval-{submission.id}-score_functionality": 92,
+                f"eval-{submission.id}-score_ux": 90,
+                f"eval-{submission.id}-comment": "Live rating",
+            },
+        )
+        self.client.force_login(self.captain)
+
+        response = self.client.get(reverse("tournament_leaderboard", args=[tournament.id]) + "?format=json")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["rows"][0]["team_name"], "Live Team")
+        self.assertEqual(payload["rows"][0]["place"], 1)
+
+    def test_organizer_can_start_and_finish_tournament_now(self):
+        tournament = self.create_tournament(
+            created_by=self.organizer_user,
+            start_date=timezone.now() + timedelta(days=5),
+            end_date=timezone.now() + timedelta(days=6),
+            registration_end=timezone.now() + timedelta(days=3),
+        )
+        self.client.force_login(self.organizer_user)
+
+        start_response = self.client.post(reverse("start_tournament_now", args=[tournament.id]))
+        finish_response = self.client.post(reverse("finish_tournament_now", args=[tournament.id]))
+
+        self.assertRedirects(start_response, reverse("organizer_dashboard"))
+        self.assertRedirects(finish_response, reverse("organizer_dashboard"))
+        tournament.refresh_from_db()
+        self.assertFalse(tournament.is_draft)
+        self.assertLessEqual(tournament.registration_end, timezone.now())
+        self.assertLessEqual(tournament.end_date, timezone.now())
 
     def test_admin_can_open_separate_create_user_page(self):
         self.client.force_login(self.admin_user)
@@ -514,6 +831,140 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Потрібно щонайменше: 3")
         self.assertFalse(TournamentRegistration.objects.filter(tournament=tournament, team=my_team).exists())
+
+    def test_registration_rejects_email_that_is_already_in_another_team_of_same_tournament(self):
+        tournament = self.create_tournament(
+            min_team_members=2,
+            max_team_members=3,
+            registration_fields_config=[
+                {"key": "participants", "label": "Учасники", "type": "participants", "required": True},
+            ],
+        )
+        other_captain = User.objects.create_user(
+            username="captain_other",
+            password="secret123",
+            role="captain",
+            is_approved=True,
+            email="captain_other@example.com",
+        )
+        other_team = Team.objects.create(
+            name="Other Team",
+            captain_user=other_captain,
+            captain_name="Other Captain",
+            captain_email="captain_other@example.com",
+        )
+        other_registration = TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=other_team,
+            registered_by=other_captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        RegistrationMember.objects.create(
+            registration=other_registration,
+            full_name="Shared Student",
+            email="shared@example.com",
+        )
+
+        response = self.client.post(
+            reverse("register_team_for_tournament", args=[tournament.id]),
+            {
+                "team_name": "My Team",
+                "captain_name": "Captain",
+                "captain_email": "captain@example.com",
+                "field_participants": '[{"full_name":"Іван","email":"shared@example.com"}]',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Один email не може бути у двох командах цього турніру.")
+        self.assertFalse(
+            TournamentRegistration.objects.filter(
+                tournament=tournament,
+                team__captain_user=self.captain,
+            ).exists()
+        )
+
+    def test_captain_cannot_edit_team_after_registration_end(self):
+        tournament = self.create_tournament(registration_end=timezone.now() - timedelta(hours=2))
+        team = Team.objects.create(
+            name="Locked Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+
+        response = self.client.post(
+            reverse("edit_team", args=[team.id]),
+            {
+                "name": "Updated Team",
+                "captain_name": "Captain",
+                "captain_email": "captain@example.com",
+                "school": "",
+                "telegram": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("team_detail", args=[team.id]))
+        team.refresh_from_db()
+        self.assertEqual(team.name, "Locked Team")
+
+    def test_captain_cannot_add_participant_after_registration_end(self):
+        tournament = self.create_tournament(registration_end=timezone.now() - timedelta(hours=2))
+        team = Team.objects.create(
+            name="Locked Roster Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+
+        response = self.client.post(
+            reverse("add_participant", args=[team.id]),
+            {
+                "full_name": "Late Member",
+                "email": "late@example.com",
+            },
+        )
+
+        self.assertRedirects(response, reverse("team_detail", args=[team.id]))
+        self.assertFalse(team.participants.filter(email="late@example.com").exists())
+
+    def test_participant_cannot_leave_team_after_registration_end(self):
+        self.client.force_login(self.participant_user)
+        tournament = self.create_tournament(registration_end=timezone.now() - timedelta(hours=2))
+        team = Team.objects.create(
+            name="Closed Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        Participant.objects.create(
+            team=team,
+            full_name="Member",
+            email=self.participant_user.email,
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+
+        response = self.client.post(reverse("leave_team", args=[team.id]))
+
+        self.assertRedirects(response, reverse("team_detail", args=[team.id]))
+        self.assertTrue(team.participants.filter(email=self.participant_user.email).exists())
 
     def test_tasks_stay_locked_until_registration_is_approved(self):
         tournament = self.create_tournament(

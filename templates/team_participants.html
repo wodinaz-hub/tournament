@@ -36,13 +36,11 @@ body {
     flex-wrap: wrap;
     align-items: stretch;
 }
-
 .toolbar form {
     margin: 0;
     display: flex;
     align-items: stretch;
 }
-
 .btn,
 .back {
     display: inline-flex;
@@ -108,6 +106,15 @@ body {
     gap: 10px;
     flex-wrap: wrap;
 }
+.notice {
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #f8d7a7;
+    background: #fff7e8;
+    color: #8a5a00;
+    line-height: 1.5;
+}
 </style>
 </head>
 <body>
@@ -119,7 +126,7 @@ body {
                 <div class="meta">Капітан: {{ team.captain_name }}</div>
             </div>
             <div class="toolbar">
-                {% if can_manage_team %}
+                {% if can_manage_roster %}
                     <a class="btn" href="{% url 'add_participant' team.id %}">Додати учасника</a>
                 {% endif %}
                 {% if can_leave_team %}
@@ -132,21 +139,25 @@ body {
             </div>
         </div>
 
+        {% if roster_locked %}
+            <div class="notice">Після завершення реєстрації змінювати склад команди може лише адміністратор.</div>
+        {% endif %}
+
         {% for participant in participants %}
             <div class="item">
                 <div class="name">{{ participant.full_name }}</div>
                 <div class="meta">{{ participant.email }}</div>
-                {% if can_manage_team %}
+                {% if can_manage_roster %}
                     <div class="item-actions">
-                    <form method="post" action="{% url 'delete_participant' team.id participant.id %}" style="margin:0;">
-                        {% csrf_token %}
-                        <button class="btn-red" type="submit">Видалити учасника</button>
-                    </form>
+                        <form method="post" action="{% url 'delete_participant' team.id participant.id %}" style="margin:0;">
+                            {% csrf_token %}
+                            <button class="btn-red" type="submit">Видалити учасника</button>
+                        </form>
                     </div>
                 {% endif %}
             </div>
         {% empty %}
-            <div class="meta">У команді поки немає учасників.</div>
+            <div class="meta">У команди поки немає учасників.</div>
         {% endfor %}
     </div>
 </div>

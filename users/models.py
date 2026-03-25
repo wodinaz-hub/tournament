@@ -7,12 +7,15 @@ class CustomUser(AbstractUser):
         ('participant', 'Participant'),
         ('captain', 'Captain'),
         ('jury', 'Jury'),
+        ('curator', 'Curator'),
         ('organizer', 'Organizer'),
         ('admin', 'Admin'),
     )
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='participant')
     is_approved = models.BooleanField(default=False)
+    announcements_seen_at = models.DateTimeField(null=True, blank=True)
+    certificates_seen_at = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if self.role == 'participant':

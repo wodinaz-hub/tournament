@@ -1,7 +1,8 @@
 from typing import Any, Dict, Iterable
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.core.validators import validate_email
+from django.db import models, transaction
 
 from users.models import CustomUser
 
@@ -19,11 +20,15 @@ class RegistrationService:
             email = (item.get("email") or "").strip().lower()
 
             if not full_name:
-                raise ValidationError("Participant full name is required.")
+                raise ValidationError("Вкажіть ім'я учасника.")
             if not email:
-                raise ValidationError("Participant email is required.")
+                raise ValidationError("Вкажіть email учасника.")
+            try:
+                validate_email(email)
+            except ValidationError as exc:
+                raise ValidationError("Некоректний формат email учасника.") from exc
             if email in seen_emails:
-                raise ValidationError("Participant emails must be unique within the registration.")
+                raise ValidationError("Email не повинен повторюватися в межах однієї команди.")
 
             seen_emails.add(email)
             normalized.append({
@@ -32,6 +37,32 @@ class RegistrationService:
             })
 
         return normalized
+
+    @staticmethod
+    def _ensure_unique_tournament_emails(
+        *,
+        tournament: Tournament,
+        team: Team,
+        captain_email: str,
+        roster: list[dict[str, str]],
+    ) -> None:
+        active_statuses = [
+            TournamentRegistration.Status.PENDING,
+            TournamentRegistration.Status.APPROVED,
+        ]
+        emails_to_check = {captain_email}
+        emails_to_check.update(item["email"] for item in roster)
+
+        conflicting_registrations = TournamentRegistration.objects.filter(
+            tournament=tournament,
+            status__in=active_statuses,
+        ).exclude(team=team).filter(
+            models.Q(team__captain_email__in=emails_to_check)
+            | models.Q(members__email__in=emails_to_check)
+        ).distinct()
+
+        if conflicting_registrations.exists():
+            raise ValidationError("Один email не може бути у двох командах цього турніру.")
 
     @staticmethod
     @transaction.atomic
@@ -48,7 +79,7 @@ class RegistrationService:
         team = Team.objects.select_for_update().filter(captain_user=captain_user).first()
 
         if tournament.is_draft or not tournament.is_registration_open:
-            raise ValidationError("Tournament is not open for registration.")
+            raise ValidationError("Реєстрація на турнір зараз закрита.")
 
         active_statuses = [
             TournamentRegistration.Status.PENDING,
@@ -64,9 +95,17 @@ class RegistrationService:
         if not team_name:
             raise ValidationError("Вкажіть назву команди.")
         if not captain_name:
-            raise ValidationError("Вкажіть імʼя капітана.")
+            raise ValidationError("Вкажіть ім'я капітана.")
         if not captain_email:
             raise ValidationError("Вкажіть email капітана.")
+        try:
+            validate_email(captain_email)
+        except ValidationError as exc:
+            raise ValidationError("Некоректний формат email капітана.") from exc
+
+        normalized_roster = RegistrationService._normalize_roster(roster)
+        if captain_email in {item["email"] for item in normalized_roster}:
+            raise ValidationError("Email капітана не може дублюватися серед учасників.")
 
         if team is None:
             team = Team.objects.create(
@@ -96,7 +135,7 @@ class RegistrationService:
             team=team,
             status__in=active_statuses,
         ).exists():
-            raise ValidationError("Team already has an active registration for this tournament.")
+            raise ValidationError("Команда вже має активну заявку на цей турнір.")
 
         if (
             tournament.max_teams
@@ -106,11 +145,9 @@ class RegistrationService:
             ).count()
             >= tournament.max_teams
         ):
-            raise ValidationError("Tournament team limit has been reached.")
+            raise ValidationError("Ліміт команд для цього турніру вже вичерпано.")
 
-        normalized_roster = RegistrationService._normalize_roster(roster)
-
-        members_count = 1 + len(normalized_roster) if normalized_roster else team.members_count
+        members_count = 1 + len(normalized_roster)
         if (
             tournament.min_team_members is not None
             and members_count < tournament.min_team_members
@@ -125,6 +162,13 @@ class RegistrationService:
             raise ValidationError(
                 f"У команді забагато людей. Максимум дозволено: {tournament.max_team_members}."
             )
+
+        RegistrationService._ensure_unique_tournament_emails(
+            tournament=tournament,
+            team=team,
+            captain_email=captain_email,
+            roster=normalized_roster,
+        )
 
         TournamentRegistration.objects.filter(
             tournament=tournament,

@@ -13,7 +13,6 @@
             --muted: #607287;
             --primary: #2457d8;
             --primary-dark: #173b77;
-            --teal: #0f766e;
             --danger: #dc2626;
             --shadow: 0 18px 40px rgba(18, 34, 68, 0.10);
         }
@@ -86,6 +85,10 @@
         .status-running { background: #dcfce7; color: #166534; }
         .status-registration { background: #dbeafe; color: #1d4ed8; }
         .status-finished { background: #fee2e2; color: #991b1b; }
+        .status-scheduled { background: #ede9fe; color: #6d28d9; }
+        .status-draft { background: #e5e7eb; color: #374151; }
+        .actions-inline { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+        .actions-inline form { margin: 0; }
         @media (max-width: 980px) {
             .hero { flex-direction: column; }
             .title { font-size: 28px; }
@@ -110,8 +113,8 @@
         <div class="hero">
             <div class="hero-main">
                 <div class="hero-kicker">Робочий кабінет</div>
-                <h1>Керуй своїми турнірами, журі та заявками з одного місця</h1>
-                <p>Тут організатор бачить тільки свої турніри, призначене журі й заявки команд. Нічого зайвого, тільки те, що реально потрібне для запуску та супроводу події.</p>
+                <h1>Керуй своїми турнірами, призначай журі та кураторів, запускай і заверши події</h1>
+                <p>Тут організатор бачить тільки свої турніри, призначене журі, кураторів і заявки команд. Також можна вручну розпочати або завершити турнір та експортувати результати для звітності.</p>
             </div>
             <div class="hero-side">
                 <div class="stat"><strong>{{ tournaments|length }}</strong>Мої турніри</div>
@@ -123,7 +126,7 @@
             <div class="section-head">
                 <div>
                     <h2 class="section-title">Мої турніри</h2>
-                    <div class="section-note">Створення, редагування, призначення журі та додавання завдань.</div>
+                    <div class="section-note">Створення, редагування, запуск, завершення, експорт результатів та призначення команди супроводу.</div>
                 </div>
             </div>
             <div class="card">
@@ -135,18 +138,38 @@
                                 <span class="status-badge status-{{ tournament.lifecycle_status }}">{{ tournament.lifecycle_status_label }}</span>
                             </div>
                             <div class="meta">
-                                Реєстрація: {{ tournament.registration_start }} - {{ tournament.registration_end }}<br>
-                                Турнір: {{ tournament.start_date }} - {{ tournament.end_date }}<br>
+                                Реєстрація: {{ tournament.registration_start|default:"-" }} - {{ tournament.registration_end|default:"-" }}<br>
+                                Турнір: {{ tournament.start_date|default:"-" }} - {{ tournament.end_date|default:"-" }}<br>
                                 Журі:
                                 {% for jury in tournament.jury_users.all %}
                                     {{ jury.username }}{% if not forloop.last %}, {% endif %}
                                 {% empty %}
                                     не призначено
                                 {% endfor %}
+                                <br>
+                                Куратори:
+                                {% for curator in tournament.curator_users.all %}
+                                    {{ curator.username }}{% if not forloop.last %}, {% endif %}
+                                {% empty %}
+                                    не призначено
+                                {% endfor %}
                             </div>
-                            <div class="actions">
+                            <div class="actions-inline">
                                 <a class="button-secondary" href="{% url 'edit_tournament' tournament.id %}">Редагувати</a>
                                 <a class="button" href="{% url 'create_tournament_task' tournament.id %}">Додати завдання</a>
+                                <a class="button-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт CSV / Google Sheets</a>
+                                {% if tournament.lifecycle_status != 'running' and tournament.lifecycle_status != 'finished' %}
+                                    <form method="post" action="{% url 'start_tournament_now' tournament.id %}">
+                                        {% csrf_token %}
+                                        <button class="button-secondary" type="submit">Розпочати зараз</button>
+                                    </form>
+                                {% endif %}
+                                {% if tournament.lifecycle_status != 'finished' %}
+                                    <form method="post" action="{% url 'finish_tournament_now' tournament.id %}">
+                                        {% csrf_token %}
+                                        <button class="button-danger" type="submit">Завершити зараз</button>
+                                    </form>
+                                {% endif %}
                             </div>
                         </div>
                     {% empty %}
@@ -160,7 +183,7 @@
             <div class="section-head">
                 <div>
                     <h2 class="section-title">Заявки на мої турніри</h2>
-                    <div class="section-note">Підтвердження доступу команд до турніру після перевірки анкети.</div>
+                    <div class="section-note">Організатор і куратор можуть перевіряти анкети команд та підтверджувати доступ.</div>
                 </div>
             </div>
             <div class="card">
@@ -173,7 +196,7 @@
                             </div>
                             <div class="meta">Подав: {{ reg.registered_by.username }}</div>
                             {% if reg.status == "pending" %}
-                                <div class="actions">
+                                <div class="actions-inline">
                                     <form method="post" action="{% url 'approve_registration' reg.id %}">
                                         {% csrf_token %}
                                         <button class="button" type="submit">Схвалити</button>

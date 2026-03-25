@@ -2,8 +2,19 @@ import json
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
-from .models import Evaluation, Participant, Submission, Task, Team, Tournament, TournamentRegistration
+from .models import (
+    Announcement,
+    CertificateTemplate,
+    Evaluation,
+    Participant,
+    Submission,
+    Task,
+    Team,
+    Tournament,
+    TournamentRegistration,
+)
 from users.models import CustomUser
 
 
@@ -149,6 +160,7 @@ class TournamentForm(forms.ModelForm):
             'max_team_members',
             'max_teams',
             'jury_users',
+            'curator_users',
             'is_draft',
         ]
         widgets = {
@@ -159,6 +171,7 @@ class TournamentForm(forms.ModelForm):
             'max_team_members': forms.NumberInput(attrs={'class': 'form-input', 'min': 1}),
             'max_teams': forms.NumberInput(attrs={'class': 'form-input'}),
             'jury_users': forms.SelectMultiple(attrs={'class': 'form-input', 'size': 6}),
+            'curator_users': forms.SelectMultiple(attrs={'class': 'form-input', 'size': 6}),
             'is_draft': forms.CheckboxInput(),
         }
 
@@ -178,10 +191,15 @@ class TournamentForm(forms.ModelForm):
             'min_team_members',
             'max_team_members',
             'jury_users',
+            'curator_users',
         ]:
             self.fields[field_name].required = False
         self.fields['jury_users'].queryset = CustomUser.objects.filter(
             role='jury',
+            is_approved=True,
+        ).order_by('username')
+        self.fields['curator_users'].queryset = CustomUser.objects.filter(
+            role='curator',
             is_approved=True,
         ).order_by('username')
 
@@ -407,11 +425,16 @@ class TournamentRegistrationForm(forms.Form):
                     continue
 
                 full_name = (item.get('full_name') or '').strip()
-                email = (item.get('email') or '').strip()
+                email = (item.get('email') or '').strip().lower()
                 if not full_name:
                     self.add_error(field_name, f'Учасник {index}: вкажіть ім\'я.')
                 if not email:
                     self.add_error(field_name, f'Учасник {index}: вкажіть email.')
+                else:
+                    try:
+                        validate_email(email)
+                    except ValidationError:
+                        self.add_error(field_name, f'Учасник {index}: некоректний формат email.')
 
                 participants.append({
                     'full_name': full_name,
@@ -420,6 +443,13 @@ class TournamentRegistrationForm(forms.Form):
 
             if self.errors.get(field_name):
                 continue
+
+            participant_emails = [item['email'] for item in participants]
+            if len(participant_emails) != len(set(participant_emails)):
+                self.add_error(field_name, 'Email не повинен повторюватися в межах однієї команди.')
+
+            if cleaned_data.get('captain_email') and cleaned_data['captain_email'] in participant_emails:
+                self.add_error(field_name, 'Email капітана не може дублюватися серед учасників.')
 
             total_members = 1 + len(participants)
             if self.tournament.min_team_members is not None and total_members < self.tournament.min_team_members:
@@ -557,3 +587,41 @@ class EvaluationForm(forms.ModelForm):
             'score_ux': forms.NumberInput(attrs={'class': 'form-input', 'min': 0, 'max': 100}),
             'comment': forms.Textarea(attrs={'class': 'form-input', 'rows': 4}),
         }
+
+
+class AnnouncementForm(forms.ModelForm):
+    class Meta:
+        model = Announcement
+        fields = ['title', 'message', 'tournament']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-input'}),
+            'message': forms.Textarea(attrs={'class': 'form-input', 'rows': 4}),
+            'tournament': forms.Select(attrs={'class': 'form-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        allow_global = kwargs.pop('allow_global', True)
+        tournament_queryset = kwargs.pop('tournament_queryset', Tournament.objects.none())
+        super().__init__(*args, **kwargs)
+        self.fields['tournament'].required = not allow_global
+        self.fields['tournament'].queryset = tournament_queryset
+        if allow_global:
+            self.fields['tournament'].empty_label = 'Усі турніри / загальне оголошення'
+class CertificateTemplateForm(forms.ModelForm):
+    class Meta:
+        model = CertificateTemplate
+        fields = ['tournament', 'certificate_type', 'background_image']
+        widgets = {
+            'tournament': forms.Select(attrs={'class': 'form-input'}),
+            'certificate_type': forms.Select(attrs={'class': 'form-input'}),
+            'background_image': forms.ClearableFileInput(attrs={'class': 'form-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        allow_global = kwargs.pop('allow_global', True)
+        tournament_queryset = kwargs.pop('tournament_queryset', Tournament.objects.none())
+        super().__init__(*args, **kwargs)
+        self.fields['tournament'].required = not allow_global
+        self.fields['tournament'].queryset = tournament_queryset
+        if allow_global:
+            self.fields['tournament'].empty_label = 'Глобальний шаблон для всіх турнірів'

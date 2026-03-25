@@ -38,13 +38,14 @@ class RegistrationService:
     def submit_registration(
         *,
         tournament: Tournament,
-        team: Team,
         registered_by: CustomUser,
+        captain_user: CustomUser,
+        team_data: Dict[str, Any],
         form_answers: Dict[str, Any],
         roster: Iterable[Dict[str, Any]] | None = None,
     ) -> TournamentRegistration:
         tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
-        team = Team.objects.select_for_update().get(pk=team.pk)
+        team = Team.objects.select_for_update().filter(captain_user=captain_user).first()
 
         if tournament.is_draft or not tournament.is_registration_open:
             raise ValidationError("Tournament is not open for registration.")
@@ -53,6 +54,42 @@ class RegistrationService:
             TournamentRegistration.Status.PENDING,
             TournamentRegistration.Status.APPROVED,
         ]
+
+        team_name = (team_data.get("name") or "").strip()
+        captain_name = (team_data.get("captain_name") or "").strip()
+        captain_email = (team_data.get("captain_email") or "").strip().lower()
+        school = (team_data.get("school") or "").strip()
+        telegram = (team_data.get("telegram") or "").strip()
+
+        if not team_name:
+            raise ValidationError("Вкажіть назву команди.")
+        if not captain_name:
+            raise ValidationError("Вкажіть імʼя капітана.")
+        if not captain_email:
+            raise ValidationError("Вкажіть email капітана.")
+
+        if team is None:
+            team = Team.objects.create(
+                captain_user=captain_user,
+                name=team_name,
+                captain_name=captain_name,
+                captain_email=captain_email,
+                school=school or None,
+                telegram=telegram or None,
+            )
+        else:
+            team.name = team_name
+            team.captain_name = captain_name
+            team.captain_email = captain_email
+            team.school = school or None
+            team.telegram = telegram or None
+            team.save(update_fields=[
+                "name",
+                "captain_name",
+                "captain_email",
+                "school",
+                "telegram",
+            ])
 
         if TournamentRegistration.objects.filter(
             tournament=tournament,

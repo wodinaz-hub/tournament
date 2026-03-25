@@ -55,14 +55,30 @@
                 {% csrf_token %}
 
                 <h2 class="section-title">Команда</h2>
-                <label for="{{ form.team.id_for_label }}">Оберіть команду</label>
-                {{ form.team }}
-                {% if form.team.errors %}<div class="field-errors">{{ form.team.errors }}</div>{% endif %}
+                <label for="{{ form.team_name.id_for_label }}">Назва команди</label>
+                {{ form.team_name }}
+                {% if form.team_name.errors %}<div class="field-errors">{{ form.team_name.errors }}</div>{% endif %}
+
+                <label for="{{ form.captain_name.id_for_label }}">Ім'я капітана</label>
+                {{ form.captain_name }}
+                {% if form.captain_name.errors %}<div class="field-errors">{{ form.captain_name.errors }}</div>{% endif %}
+
+                <label for="{{ form.captain_email.id_for_label }}">Email капітана</label>
+                {{ form.captain_email }}
+                {% if form.captain_email.errors %}<div class="field-errors">{{ form.captain_email.errors }}</div>{% endif %}
+
+                <label for="{{ form.school.id_for_label }}">Школа</label>
+                {{ form.school }}
+                {% if form.school.errors %}<div class="field-errors">{{ form.school.errors }}</div>{% endif %}
+
+                <label for="{{ form.telegram.id_for_label }}">Telegram</label>
+                {{ form.telegram }}
+                {% if form.telegram.errors %}<div class="field-errors">{{ form.telegram.errors }}</div>{% endif %}
 
                 {% if tournament.registration_fields_config %}
                     <h2 class="section-title">Анкета</h2>
                     {% for field in form %}
-                        {% if field.name != "team" %}
+                        {% if field.name != "team_name" and field.name != "captain_name" and field.name != "captain_email" and field.name != "school" and field.name != "telegram" %}
                             <div class="field-card">
                                 <label for="{{ field.id_for_label }}">
                                     {{ field.label }}

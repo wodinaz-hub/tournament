@@ -405,7 +405,6 @@ def public_tournament_detail(request, tournament_id):
     leaderboard = build_tournament_leaderboard(tournament)
     existing_registration = None
     registration_form = None
-    can_create_team = False
     can_submit_registration = False
     viewer_can_register = (
         request.user.is_authenticated
@@ -424,8 +423,7 @@ def public_tournament_detail(request, tournament_id):
             user=request.user,
             tournament=tournament,
         )
-        can_create_team = not Team.objects.filter(captain_user=request.user).exists()
-        can_submit_registration = registration_form.fields['team'].queryset.exists()
+        can_submit_registration = True
 
         if request.method == 'POST':
             if existing_registration and existing_registration.status in [
@@ -447,15 +445,15 @@ def public_tournament_detail(request, tournament_id):
                 return redirect('public_tournament_detail', tournament_id=tournament.id)
 
             if registration_form.is_valid():
-                team = registration_form.cleaned_data['team']
                 if request.user.role == 'participant':
                     request.user.role = 'captain'
                     request.user.save(update_fields=['role'])
                 try:
                     RegistrationService.submit_registration(
                         tournament=tournament,
-                        team=team,
                         registered_by=request.user,
+                        captain_user=request.user,
+                        team_data=registration_form.cleaned_team_data(),
                         form_answers=registration_form.cleaned_form_answers(),
                         roster=registration_form.cleaned_participants(),
                     )
@@ -473,11 +471,9 @@ def public_tournament_detail(request, tournament_id):
         'registration_form': registration_form,
         'existing_registration': existing_registration,
         'viewer_can_register': viewer_can_register,
-        'can_create_team': can_create_team,
         'can_submit_registration': can_submit_registration,
         'register_url': f"{reverse('register')}?next={current_path}",
         'login_url': f"{reverse('login')}?next={current_path}",
-        'create_team_url': f"{reverse('create_team')}?next={current_path}",
     })
 
 
@@ -1059,15 +1055,15 @@ def register_team_for_tournament(request, tournament_id):
     if request.method == 'POST':
         form = TournamentRegistrationForm(request.POST, user=request.user, tournament=tournament)
         if form.is_valid():
-            team = form.cleaned_data['team']
             if request.user.role == 'participant':
                 request.user.role = 'captain'
                 request.user.save(update_fields=['role'])
             try:
                 RegistrationService.submit_registration(
                     tournament=tournament,
-                    team=team,
                     registered_by=request.user,
+                    captain_user=request.user,
+                    team_data=form.cleaned_team_data(),
                     form_answers=form.cleaned_form_answers(),
                     roster=form.cleaned_participants(),
                 )

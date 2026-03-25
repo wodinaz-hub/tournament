@@ -277,29 +277,45 @@ class ParticipantForm(forms.ModelForm):
 class TournamentRegistrationForm(forms.Form):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
+        self.user = user
         self.tournament = kwargs.pop('tournament', None)
         super().__init__(*args, **kwargs)
 
-        queryset = Team.objects.none()
+        existing_team = Team.objects.filter(captain_user=user).order_by('name').first() if user is not None else None
+        self.existing_team = existing_team
 
-        if user is not None:
-            queryset = Team.objects.filter(captain_user=user).order_by('name')
-
-        if self.tournament is not None:
-            used_team_ids = TournamentRegistration.objects.filter(
-                tournament=self.tournament,
-                status__in=[
-                    TournamentRegistration.Status.PENDING,
-                    TournamentRegistration.Status.APPROVED,
-                ],
-            ).values_list('team_id', flat=True)
-            queryset = queryset.exclude(id__in=used_team_ids)
-
-        self.fields['team'] = forms.ModelChoiceField(
-            queryset=queryset,
-            label='Команда',
-            widget=forms.Select(attrs={'class': 'form-input'}),
+        self.fields['team_name'] = forms.CharField(
+            label='Назва команди',
+            widget=forms.TextInput(attrs={'class': 'form-input'}),
         )
+        self.fields['captain_name'] = forms.CharField(
+            label="Ім'я капітана",
+            widget=forms.TextInput(attrs={'class': 'form-input'}),
+        )
+        self.fields['captain_email'] = forms.EmailField(
+            label='Email капітана',
+            widget=forms.EmailInput(attrs={'class': 'form-input'}),
+        )
+        self.fields['school'] = forms.CharField(
+            required=False,
+            label='Школа',
+            widget=forms.TextInput(attrs={'class': 'form-input'}),
+        )
+        self.fields['telegram'] = forms.CharField(
+            required=False,
+            label='Telegram',
+            widget=forms.TextInput(attrs={'class': 'form-input'}),
+        )
+
+        if existing_team is not None:
+            self.fields['team_name'].initial = existing_team.name
+            self.fields['captain_name'].initial = existing_team.captain_name
+            self.fields['captain_email'].initial = existing_team.captain_email
+            self.fields['school'].initial = existing_team.school
+            self.fields['telegram'].initial = existing_team.telegram
+        elif user is not None:
+            self.fields['captain_name'].initial = user.username
+            self.fields['captain_email'].initial = user.email
 
         for field_config in (self.tournament.registration_fields_config if self.tournament else []):
             self.fields[self.answer_field_name(field_config['key'])] = self.build_dynamic_field(field_config)
@@ -349,6 +365,19 @@ class TournamentRegistrationForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        cleaned_data['team_name'] = (cleaned_data.get('team_name') or '').strip()
+        cleaned_data['captain_name'] = (cleaned_data.get('captain_name') or '').strip()
+        cleaned_data['captain_email'] = (cleaned_data.get('captain_email') or '').strip().lower()
+        cleaned_data['school'] = (cleaned_data.get('school') or '').strip()
+        cleaned_data['telegram'] = (cleaned_data.get('telegram') or '').strip()
+
+        if not cleaned_data['team_name']:
+            self.add_error('team_name', 'Вкажіть назву команди.')
+        if not cleaned_data['captain_name']:
+            self.add_error('captain_name', 'Вкажіть імʼя капітана.')
+        if not cleaned_data['captain_email']:
+            self.add_error('captain_email', 'Вкажіть email капітана.')
+
         for field_config in (self.tournament.registration_fields_config if self.tournament else []):
             if field_config['type'] != 'participants':
                 continue
@@ -407,6 +436,15 @@ class TournamentRegistrationForm(forms.Form):
             cleaned_data[field_name] = participants
 
         return cleaned_data
+
+    def cleaned_team_data(self):
+        return {
+            'name': self.cleaned_data['team_name'],
+            'captain_name': self.cleaned_data['captain_name'],
+            'captain_email': self.cleaned_data['captain_email'],
+            'school': self.cleaned_data.get('school', ''),
+            'telegram': self.cleaned_data.get('telegram', ''),
+        }
 
     def cleaned_form_answers(self):
         answers = {}

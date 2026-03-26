@@ -1,6 +1,7 @@
 ﻿import csv
 import io
 import os
+import logging
 from datetime import timedelta
 from statistics import mean
 
@@ -11,6 +12,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.template.loader import render_to_string
 from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse
@@ -53,6 +55,8 @@ from tournament.services import RegistrationService
 
 from .forms import AdminCreateUserForm, LoginForm, RegisterForm
 from .models import CustomUser
+
+logger = logging.getLogger(__name__)
 
 
 def is_super_admin(user):
@@ -112,6 +116,16 @@ def send_verification_email(request, user):
         recipient_list=[user.email],
         fail_silently=False,
     )
+
+
+def email_delivery_ready():
+    non_delivery_backends = {
+        'django.core.mail.backends.console.EmailBackend',
+        'django.core.mail.backends.dummy.EmailBackend',
+        'django.core.mail.backends.locmem.EmailBackend',
+        'django.core.mail.backends.filebased.EmailBackend',
+    }
+    return settings.DEBUG or settings.EMAIL_BACKEND not in non_delivery_backends
 
 
 def can_manage_tournament_instance(user, tournament):
@@ -853,21 +867,37 @@ def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            user = form.save(commit=False)
-            user.role = 'participant'
-            user.is_approved = True
-            user.email_verified = False
-            user.email_verified_at = None
-            user.save()
-            RegistrationMember.objects.filter(
-                user__isnull=True,
-                email__iexact=user.email,
-            ).update(user=user)
-            send_verification_email(request, user)
-            success_url = reverse('register_success')
-            if next_url:
-                success_url = f"{success_url}?next={next_url}"
-            return redirect(success_url)
+            if not email_delivery_ready():
+                form.add_error(
+                    None,
+                    "На сервері не налаштовано реальну відправку email. "
+                    "Заповніть SMTP-параметри, а потім повторіть реєстрацію.",
+                )
+                return render(request, 'register.html', {'form': form, 'next_url': next_url})
+            try:
+                with transaction.atomic():
+                    user = form.save(commit=False)
+                    user.role = 'participant'
+                    user.is_approved = True
+                    user.email_verified = False
+                    user.email_verified_at = None
+                    user.save()
+                    RegistrationMember.objects.filter(
+                        user__isnull=True,
+                        email__iexact=user.email,
+                    ).update(user=user)
+                    send_verification_email(request, user)
+            except Exception:
+                logger.exception("Failed to send verification email during registration")
+                form.add_error(
+                    None,
+                    "Не вдалося надіслати лист підтвердження. Перевірте налаштування пошти або спробуйте пізніше.",
+                )
+            else:
+                success_url = reverse('register_success')
+                if next_url:
+                    success_url = f"{success_url}?next={next_url}"
+                return redirect(success_url)
     else:
         form = RegisterForm()
 

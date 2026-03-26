@@ -2,6 +2,7 @@
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
@@ -188,6 +189,49 @@ class TournamentPlatformViewTests(TestCase):
         user.refresh_from_db()
         self.assertTrue(user.email_verified)
         self.assertIsNotNone(user.email_verified_at)
+
+    @override_settings(
+        DEBUG=True,
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    @patch("users.views.send_verification_email", side_effect=RuntimeError("smtp failed"))
+    def test_register_does_not_create_user_if_email_sending_failed(self, _mock_send):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "brokenmail",
+                "email": "brokenmail@example.com",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Не вдалося надіслати лист підтвердження")
+        self.assertFalse(User.objects.filter(username="brokenmail").exists())
+
+    @override_settings(
+        DEBUG=False,
+        EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend",
+    )
+    def test_register_requires_real_email_delivery_in_production(self):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "prodmail",
+                "email": "prodmail@example.com",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "На сервері не налаштовано реальну відправку email")
+        self.assertFalse(User.objects.filter(username="prodmail").exists())
 
     def test_register_form_rejects_duplicate_email(self):
         self.client.logout()

@@ -2,12 +2,17 @@
 Django settings for core project.
 """
 
+import importlib.util
 import os
 from pathlib import Path
 
-import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+
+try:
+    import dj_database_url
+except ImportError:  # pragma: no cover - local fallback for incomplete environments
+    dj_database_url = None
 
 
 load_dotenv()
@@ -56,7 +61,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+]
+if importlib.util.find_spec("whitenoise") is not None:
+    MIDDLEWARE.append("whitenoise.middleware.WhiteNoiseMiddleware")
+MIDDLEWARE += [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -96,10 +104,14 @@ db_password = env("DB_PASSWORD")
 db_host = env("DB_HOST")
 db_port = env("DB_PORT")
 
-if database_url:
+if database_url and dj_database_url:
     DATABASES = {
         "default": dj_database_url.parse(database_url)
     }
+elif database_url:
+    raise ImproperlyConfigured(
+        "DATABASE_URL задано, але пакет dj-database-url не встановлений."
+    )
 elif all([db_name, db_user, db_password, db_host, db_port]):
     DATABASES = {
         "default": {
@@ -157,7 +169,11 @@ if (BASE_DIR / "static").exists():
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if importlib.util.find_spec("whitenoise") is not None
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
+        ),
     },
 }
 MEDIA_URL = "/media/"
@@ -166,15 +182,19 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-EMAIL_BACKEND = env(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend",
-)
-EMAIL_HOST = env("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(env("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_BACKEND = env("EMAIL_BACKEND", "")
+if not EMAIL_BACKEND:
+    if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+        EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    else:
+        EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_HOST = env("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(env("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = env("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_SSL = env("EMAIL_USE_SSL", "false").lower() == "true"
+EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "20"))
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@serverdenis.pp.ua")
 
 

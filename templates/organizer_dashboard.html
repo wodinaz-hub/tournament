@@ -27,50 +27,26 @@
                 linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 42%, #ffffff 100%);
         }
         .wrap { max-width: 1220px; margin: 0 auto; padding: 26px 20px 42px; }
-        .topbar, .hero, .section-head, .actions {
-            display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between;
-        }
-        .topbar {
-            padding: 16px 18px;
-            border-radius: 22px;
-            background: rgba(255,255,255,0.82);
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(14px);
-        }
+        .topbar, .hero, .section-head, .actions { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        .topbar { padding: 16px 18px; border-radius: 22px; background: rgba(255,255,255,0.82); border: 1px solid var(--border); box-shadow: var(--shadow); backdrop-filter: blur(14px); }
         .title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; }
         .meta { color: var(--muted); line-height: 1.65; }
         .button, .button-secondary, .button-danger {
-            display: inline-flex; align-items: center; justify-content: center;
-            min-height: 42px; padding: 11px 16px; border-radius: 12px;
+            display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 11px 16px; border-radius: 12px;
             border: 1px solid transparent; text-decoration: none; font-weight: 700; cursor: pointer;
         }
         .nav-badge { position: relative; }
         .notify-dot {
-            position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px;
-            border-radius: 999px; background: #dc2626; color: white; font-size: 11px;
-            display: inline-flex; align-items: center; justify-content: center; font-weight: 800;
+            position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+            background: #dc2626; color: white; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800;
         }
         .button { background: var(--primary); color: white; }
         .button-secondary { background: white; color: var(--primary); border-color: #cbd5e1; }
         .button-danger { background: var(--danger); color: white; }
         .hero { margin: 24px 0 28px; gap: 18px; align-items: stretch; }
-        .hero-main, .hero-side, .card {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 26px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(10px);
-        }
-        .hero-main {
-            flex: 1.2; padding: 28px; color: white;
-            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 62%, #1d4ed8 100%);
-        }
-        .hero-kicker {
-            display: inline-flex; padding: 7px 11px; border-radius: 999px;
-            background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.16);
-            font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 14px;
-        }
+        .hero-main, .hero-side, .card { background: var(--panel); border: 1px solid var(--border); border-radius: 26px; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+        .hero-main { flex: 1.2; padding: 28px; color: white; background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 62%, #1d4ed8 100%); }
+        .hero-kicker { display: inline-flex; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.16); font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 14px; }
         .hero-main h1 { margin: 0 0 10px; font-size: 40px; line-height: 1.08; letter-spacing: -0.03em; }
         .hero-main p { margin: 0; max-width: 650px; line-height: 1.75; color: rgba(255,255,255,0.88); }
         .hero-side { flex: 0.8; padding: 24px; display: grid; gap: 12px; }
@@ -95,11 +71,7 @@
         .status-draft { background: #e5e7eb; color: #374151; }
         .actions-inline { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
         .actions-inline form { margin: 0; }
-        @media (max-width: 980px) {
-            .hero { flex-direction: column; }
-            .title { font-size: 28px; }
-            .hero-main h1 { font-size: 34px; }
-        }
+        @media (max-width: 980px) { .hero { flex-direction: column; } .title { font-size: 28px; } .hero-main h1 { font-size: 34px; } }
     </style>
 </head>
 <body>
@@ -121,8 +93,8 @@
         <div class="hero">
             <div class="hero-main">
                 <div class="hero-kicker">Робочий кабінет</div>
-                <h1>Керуй своїми турнірами, призначай журі та кураторів, запускай і заверши події</h1>
-                <p>Тут організатор бачить тільки свої турніри, призначене журі, кураторів і заявки команд. Також можна вручну розпочати або завершити турнір та експортувати результати для звітності.</p>
+                <h1>Керуйте турнірами, заявками, завданнями та дедлайнами</h1>
+                <p>Тут можна створювати та редагувати свої турніри, перевіряти заявки команд і швидко переходити до завдань та експорту результатів.</p>
             </div>
             <div class="hero-side">
                 <div class="stat"><strong>{{ tournaments|length }}</strong>Мої турніри</div>
@@ -134,7 +106,7 @@
             <div class="section-head">
                 <div>
                     <h2 class="section-title">Мої турніри</h2>
-                    <div class="section-note">Створення, редагування, запуск, завершення, експорт результатів та призначення команди супроводу.</div>
+                    <div class="section-note">Усі ваші активні, майбутні та завершені турніри в одному списку.</div>
                 </div>
             </div>
             <div class="card">
@@ -154,18 +126,11 @@
                                 {% empty %}
                                     не призначено
                                 {% endfor %}
-                                <br>
-                                Куратори:
-                                {% for curator in tournament.curator_users.all %}
-                                    {{ curator.username }}{% if not forloop.last %}, {% endif %}
-                                {% empty %}
-                                    не призначено
-                                {% endfor %}
                             </div>
                             <div class="actions-inline">
                                 <a class="button-secondary" href="{% url 'edit_tournament' tournament.id %}">Редагувати</a>
                                 <a class="button" href="{% url 'create_tournament_task' tournament.id %}">Додати завдання</a>
-                                <a class="button-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт CSV / Google Sheets</a>
+                                <a class="button-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт результатів CSV</a>
                                 {% if tournament.lifecycle_status != 'running' and tournament.lifecycle_status != 'finished' %}
                                     <form method="post" action="{% url 'start_tournament_now' tournament.id %}">
                                         {% csrf_token %}
@@ -191,7 +156,7 @@
             <div class="section-head">
                 <div>
                     <h2 class="section-title">Заявки на мої турніри</h2>
-                    <div class="section-note">Організатор і куратор можуть перевіряти анкети команд та підтверджувати доступ.</div>
+                    <div class="section-note">Тут видно команди, їхні контактні дані та поточний статус заявки.</div>
                 </div>
             </div>
             <div class="card">
@@ -202,7 +167,13 @@
                                 <strong>{{ reg.team.name }} → {{ reg.tournament.name }}</strong>
                                 <span class="status-badge status-{{ reg.status }}">{{ reg.get_status_display }}</span>
                             </div>
-                            <div class="meta">Подав: {{ reg.registered_by.username }}</div>
+                            <div class="meta">
+                                Контактна особа: {{ reg.team.captain_name }} * ({{ reg.team.captain_email }})<br>
+                                Телеграм: {{ reg.team.telegram|default:"-" }}<br>
+                                Діскорд: {{ reg.team.discord|default:"-" }}<br>
+                                Вайбер: {{ reg.team.viber|default:"-" }}<br>
+                                Подав: {{ reg.registered_by.username }}
+                            </div>
                             {% if reg.status == "pending" %}
                                 <div class="actions-inline">
                                     <form method="post" action="{% url 'approve_registration' reg.id %}">

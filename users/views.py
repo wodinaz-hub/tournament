@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import io
 import os
 from datetime import timedelta
@@ -59,8 +59,8 @@ def is_organizer_user(user):
     return user.role == 'organizer'
 
 
-def is_curator_user(user):
-    return user.role == 'curator'
+def is_participant_user(user):
+    return getattr(user, 'role', None) == 'participant'
 
 
 def can_manage_users(user):
@@ -76,7 +76,7 @@ def can_manage_tournaments(user):
 
 
 def can_review_registrations(user):
-    return is_admin_user(user) or is_organizer_user(user) or is_curator_user(user)
+    return is_admin_user(user) or is_organizer_user(user)
 
 
 def can_manage_tournament_instance(user, tournament):
@@ -87,7 +87,6 @@ def can_manage_registration_instance(user, registration):
     return (
         is_admin_user(user)
         or registration.tournament.created_by_id == user.id
-        or registration.tournament.curator_users.filter(id=user.id).exists()
     )
 
 
@@ -95,7 +94,6 @@ def can_view_curated_tournament(user, tournament):
     return (
         is_admin_user(user)
         or tournament.created_by_id == user.id
-        or tournament.curator_users.filter(id=user.id).exists()
     )
 
 
@@ -104,15 +102,13 @@ def get_dashboard_url_for_user(user):
         return reverse('admin_users')
     if is_organizer_user(user):
         return reverse('organizer_dashboard')
-    if is_curator_user(user):
-        return reverse('curator_dashboard')
     if user.role == 'jury':
         return reverse('jury_dashboard')
     return reverse('home')
 
 
 def get_available_admin_roles(user):
-    roles = {'participant', 'captain', 'jury', 'curator', 'organizer'}
+    roles = {'participant', 'jury', 'organizer'}
     if can_create_admins(user):
         roles.add('admin')
     return roles
@@ -122,7 +118,6 @@ def can_export_tournament_results(user, tournament):
     return (
         is_admin_user(user)
         or tournament.created_by_id == user.id
-        or tournament.curator_users.filter(id=user.id).exists()
         or tournament.jury_users.filter(id=user.id).exists()
     )
 
@@ -181,7 +176,7 @@ def build_certificate_pdf_response(certificate):
         certificate_type=certificate.certificate_type,
     )
     if template is None or not template.background_image:
-        raise ValidationError('Для цього типу сертифіката ще не завантажено шаблон.')
+        raise ValidationError('Р”Р»СЏ С†СЊРѕРіРѕ С‚РёРїСѓ СЃРµСЂС‚РёС„С–РєР°С‚Р° С‰Рµ РЅРµ Р·Р°РІР°РЅС‚Р°Р¶РµРЅРѕ С€Р°Р±Р»РѕРЅ.')
 
     with Image.open(template.background_image.path) as source_image:
         image = source_image.convert('RGB')
@@ -195,15 +190,15 @@ def build_certificate_pdf_response(certificate):
     center_x = width / 2
 
     title = (
-        'Сертифікат переможця'
+        'РЎРµСЂС‚РёС„С–РєР°С‚ РїРµСЂРµРјРѕР¶С†СЏ'
         if certificate.certificate_type == Certificate.CertificateType.WINNER
-        else 'Сертифікат учасника'
+        else 'РЎРµСЂС‚РёС„С–РєР°С‚ СѓС‡Р°СЃРЅРёРєР°'
     )
     subtitle = certificate.tournament.name
     footer_parts = []
     if certificate.team_id:
-        footer_parts.append(f'Команда: {certificate.team.name}')
-    footer_parts.append(f'Дата: {timezone.localtime(certificate.issued_at).strftime("%d.%m.%Y")}')
+        footer_parts.append(f'РљРѕРјР°РЅРґР°: {certificate.team.name}')
+    footer_parts.append(f'Р”Р°С‚Р°: {timezone.localtime(certificate.issued_at).strftime("%d.%m.%Y")}')
     footer = ' | '.join(footer_parts)
 
     for text, font, y in [
@@ -388,14 +383,14 @@ def build_admin_dashboard_context(current_user, admin_create_user_form=None):
 
 def build_admin_nav_items():
     return [
-        {'url': reverse('admin_users'), 'label': 'Користувачі'},
-        {'url': reverse('admin_users') + '?action=create-user', 'label': 'Створити користувача'},
-        {'url': reverse('admin_active_tournaments'), 'label': 'Активні турніри'},
-        {'url': reverse('admin_inactive_tournaments'), 'label': 'Неактивні турніри'},
-        {'url': reverse('admin_active_tournaments') + '?action=create-tournament', 'label': 'Створити турнір'},
-        {'url': reverse('admin_teams'), 'label': 'Команди'},
-        {'url': reverse('admin_registrations'), 'label': 'Заявки'},
-        {'url': reverse('admin_submissions'), 'label': 'Роботи'},
+        {'url': reverse('admin_users'), 'label': 'РљРѕСЂРёСЃС‚СѓРІР°С‡С–'},
+        {'url': reverse('admin_users') + '?action=create-user', 'label': 'РЎС‚РІРѕСЂРёС‚Рё РєРѕСЂРёСЃС‚СѓРІР°С‡Р°'},
+        {'url': reverse('admin_active_tournaments'), 'label': 'РђРєС‚РёРІРЅС– С‚СѓСЂРЅС–СЂРё'},
+        {'url': reverse('admin_inactive_tournaments'), 'label': 'РќРµР°РєС‚РёРІРЅС– С‚СѓСЂРЅС–СЂРё'},
+        {'url': reverse('admin_active_tournaments') + '?action=create-tournament', 'label': 'РЎС‚РІРѕСЂРёС‚Рё С‚СѓСЂРЅС–СЂ'},
+        {'url': reverse('admin_teams'), 'label': 'РљРѕРјР°РЅРґРё'},
+        {'url': reverse('admin_registrations'), 'label': 'Р—Р°СЏРІРєРё'},
+        {'url': reverse('admin_submissions'), 'label': 'Р РѕР±РѕС‚Рё'},
     ]
 
 
@@ -475,12 +470,12 @@ def build_user_message_items(user):
     seen_keys = set()
     now = timezone.now()
     kind_labels = {
-        'announcement': 'Оголошення',
-        'status': 'Статус',
-        'event': 'Подія',
-        'deadline': 'Дедлайн',
-        'finished': 'Завершено',
-        'system': 'Система',
+        'announcement': 'РћРіРѕР»РѕС€РµРЅРЅСЏ',
+        'status': 'РЎС‚Р°С‚СѓСЃ',
+        'event': 'РџРѕРґС–СЏ',
+        'deadline': 'Р”РµРґР»Р°Р№РЅ',
+        'finished': 'Р—Р°РІРµСЂС€РµРЅРѕ',
+        'system': 'РЎРёСЃС‚РµРјР°',
     }
 
     def add_item(*, key, title, body, created_at, kind='system', tournament=None):
@@ -493,7 +488,7 @@ def build_user_message_items(user):
             'body': body,
             'created_at': created_at,
             'kind': kind,
-            'kind_label': kind_labels.get(kind, 'Система'),
+            'kind_label': kind_labels.get(kind, 'РЎРёСЃС‚РµРјР°'),
             'tournament': tournament,
         })
 
@@ -513,14 +508,14 @@ def build_user_message_items(user):
             if tournament.registration_start is not None:
                 add_item(
                     key=f"registration-open:{tournament.id}",
-                    title=f"Старт реєстрації: {tournament.name}",
-                    body="Реєстрацію на турнір відкрито. Можна подавати заявки команди.",
+                    title=f"РЎС‚Р°СЂС‚ СЂРµС”СЃС‚СЂР°С†С–С—: {tournament.name}",
+                    body="Р РµС”СЃС‚СЂР°С†С–СЋ РЅР° С‚СѓСЂРЅС–СЂ РІС–РґРєСЂРёС‚Рѕ. РњРѕР¶РЅР° РїРѕРґР°РІР°С‚Рё Р·Р°СЏРІРєРё РєРѕРјР°РЅРґРё.",
                     created_at=tournament.registration_start,
                     kind='event',
                     tournament=tournament,
                 )
 
-    if getattr(user, 'is_authenticated', False) and user.role in ['participant', 'captain']:
+    if getattr(user, 'is_authenticated', False) and is_participant_user(user):
         registrations = TournamentRegistration.objects.select_related(
             'tournament',
             'team',
@@ -531,8 +526,8 @@ def build_user_message_items(user):
             tournament = registration.tournament
             add_item(
                 key=f"registration:{registration.id}:{registration.status}",
-                title=f"Статус заявки: {tournament.name}",
-                body=f"Заявка команди {registration.team.name} має статус «{registration.get_status_display()}».",
+                title=f"РЎС‚Р°С‚СѓСЃ Р·Р°СЏРІРєРё: {tournament.name}",
+                body=f"Р—Р°СЏРІРєР° РєРѕРјР°РЅРґРё {registration.team.name} РјР°С” СЃС‚Р°С‚СѓСЃ В«{registration.get_status_display()}В».",
                 created_at=registration.created_at,
                 kind='status',
                 tournament=tournament,
@@ -541,8 +536,8 @@ def build_user_message_items(user):
                 if tournament.start_date is not None:
                     add_item(
                         key=f"start:{tournament.id}",
-                        title=f"Старт завдань: {tournament.name}",
-                        body="Завдання турніру вже доступні. Перевірте умови, дедлайни та подайте сабміти вчасно.",
+                        title=f"РЎС‚Р°СЂС‚ Р·Р°РІРґР°РЅСЊ: {tournament.name}",
+                        body="Р—Р°РІРґР°РЅРЅСЏ С‚СѓСЂРЅС–СЂСѓ РІР¶Рµ РґРѕСЃС‚СѓРїРЅС–. РџРµСЂРµРІС–СЂС‚Рµ СѓРјРѕРІРё, РґРµРґР»Р°Р№РЅРё С‚Р° РїРѕРґР°Р№С‚Рµ СЃР°Р±РјС–С‚Рё РІС‡Р°СЃРЅРѕ.",
                         created_at=tournament.start_date,
                         kind='event',
                         tournament=tournament,
@@ -552,8 +547,8 @@ def build_user_message_items(user):
                     if deadline_24h <= now:
                         add_item(
                             key=f"deadline:{tournament.id}",
-                            title=f"24 години до дедлайну: {tournament.name}",
-                            body="До завершення турніру залишилася доба. Перевірте, чи всі сабміти подані.",
+                            title=f"24 РіРѕРґРёРЅРё РґРѕ РґРµРґР»Р°Р№РЅСѓ: {tournament.name}",
+                            body="Р”Рѕ Р·Р°РІРµСЂС€РµРЅРЅСЏ С‚СѓСЂРЅС–СЂСѓ Р·Р°Р»РёС€РёР»Р°СЃСЏ РґРѕР±Р°. РџРµСЂРµРІС–СЂС‚Рµ, С‡Рё РІСЃС– СЃР°Р±РјС–С‚Рё РїРѕРґР°РЅС–.",
                             created_at=deadline_24h,
                             kind='deadline',
                             tournament=tournament,
@@ -561,8 +556,8 @@ def build_user_message_items(user):
                     if tournament.is_finished:
                         add_item(
                             key=f"finished:{tournament.id}",
-                            title=f"Сабміти закрито: {tournament.name}",
-                            body="Турнір завершено. Тепер можна переглядати підсумкові результати та офіційні відповіді.",
+                            title=f"РЎР°Р±РјС–С‚Рё Р·Р°РєСЂРёС‚Рѕ: {tournament.name}",
+                            body="РўСѓСЂРЅС–СЂ Р·Р°РІРµСЂС€РµРЅРѕ. РўРµРїРµСЂ РјРѕР¶РЅР° РїРµСЂРµРіР»СЏРґР°С‚Рё РїС–РґСЃСѓРјРєРѕРІС– СЂРµР·СѓР»СЊС‚Р°С‚Рё С‚Р° РѕС„С–С†С–Р№РЅС– РІС–РґРїРѕРІС–РґС–.",
                             created_at=tournament.end_date,
                             kind='finished',
                             tournament=tournament,
@@ -691,13 +686,13 @@ def home(request):
     for row in tournament_rows[:4]:
         tournament = row['tournament']
         if tournament.is_registration_open:
-            text = 'Відкрита реєстрація. Можна подавати заявки.'
+            text = 'Р’С–РґРєСЂРёС‚Р° СЂРµС”СЃС‚СЂР°С†С–СЏ. РњРѕР¶РЅР° РїРѕРґР°РІР°С‚Рё Р·Р°СЏРІРєРё.'
         elif tournament.is_running:
-            text = 'Турнір уже триває.'
+            text = 'РўСѓСЂРЅС–СЂ СѓР¶Рµ С‚СЂРёРІР°С”.'
         elif tournament.is_finished:
-            text = 'Турнір завершено. Доступний підсумковий лідерборд.'
+            text = 'РўСѓСЂРЅС–СЂ Р·Р°РІРµСЂС€РµРЅРѕ. Р”РѕСЃС‚СѓРїРЅРёР№ РїС–РґСЃСѓРјРєРѕРІРёР№ Р»С–РґРµСЂР±РѕСЂРґ.'
         else:
-            text = 'Турнір заплановано. Слідкуйте за датами старту.'
+            text = 'РўСѓСЂРЅС–СЂ Р·Р°РїР»Р°РЅРѕРІР°РЅРѕ. РЎР»С–РґРєСѓР№С‚Рµ Р·Р° РґР°С‚Р°РјРё СЃС‚Р°СЂС‚Сѓ.'
         news_rows.append({'tournament': tournament, 'text': text})
 
     return render(request, 'home.html', {
@@ -705,11 +700,11 @@ def home(request):
         'filtered_tournament_rows': filtered_tournament_rows,
         'filter_status': filter_status,
         'filter_choices': [
-            {'value': 'all', 'label': 'Усі'},
-            {'value': 'registration', 'label': 'Реєстрація'},
-            {'value': 'running', 'label': 'Тривають'},
-            {'value': 'finished', 'label': 'Завершені'},
-            {'value': 'scheduled', 'label': 'Майбутні'},
+            {'value': 'all', 'label': 'РЈСЃС–'},
+            {'value': 'registration', 'label': 'Р РµС”СЃС‚СЂР°С†С–СЏ'},
+            {'value': 'running', 'label': 'РўСЂРёРІР°СЋС‚СЊ'},
+            {'value': 'finished', 'label': 'Р—Р°РІРµСЂС€РµРЅС–'},
+            {'value': 'scheduled', 'label': 'РњР°Р№Р±СѓС‚РЅС–'},
         ],
         'featured_tournaments': featured_tournaments[:3],
         'active_tournaments': active_tournaments[:3],
@@ -848,12 +843,12 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             if not user.is_approved and not user.is_superuser:
-                message = 'Ваш акаунт ще не схвалений адміністратором.'
+                message = 'Р’Р°С€ Р°РєР°СѓРЅС‚ С‰Рµ РЅРµ СЃС…РІР°Р»РµРЅРёР№ Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂРѕРј.'
             else:
                 login(request, user)
                 return redirect(get_safe_redirect(request, next_url, reverse('redirect_by_role')))
         else:
-            message = 'Неправильний логін або пароль.'
+            message = 'РќРµРїСЂР°РІРёР»СЊРЅРёР№ Р»РѕРіС–РЅ Р°Р±Рѕ РїР°СЂРѕР»СЊ.'
     else:
         form = LoginForm()
 
@@ -872,8 +867,6 @@ def redirect_by_role(request):
 
     if is_admin_user(user) or is_organizer_user(user):
         return redirect('home')
-    if is_curator_user(user):
-        return redirect('curator_dashboard')
     if user.role == 'jury':
         return redirect('jury_dashboard')
     return redirect('home')
@@ -891,7 +884,7 @@ def public_tournament_detail(request, tournament_id):
     can_submit_registration = False
     viewer_can_register = (
         request.user.is_authenticated
-        and (request.user.is_superuser or request.user.role in ['participant', 'captain'])
+        and (request.user.is_superuser or is_participant_user(request.user))
     )
 
     if request.user.is_authenticated:
@@ -928,9 +921,6 @@ def public_tournament_detail(request, tournament_id):
                 return redirect('public_tournament_detail', tournament_id=tournament.id)
 
             if registration_form.is_valid():
-                if request.user.role == 'participant':
-                    request.user.role = 'captain'
-                    request.user.save(update_fields=['role'])
                 try:
                     RegistrationService.submit_registration(
                         tournament=tournament,
@@ -1074,7 +1064,6 @@ def organizer_dashboard(request):
     tournaments = Tournament.objects.filter(created_by=request.user).prefetch_related(
         'tasks',
         'jury_users',
-        'curator_users',
     )
     registrations = TournamentRegistration.objects.filter(
         tournament__created_by=request.user,
@@ -1082,61 +1071,6 @@ def organizer_dashboard(request):
     return render(request, 'organizer_dashboard.html', {
         'tournaments': tournaments.order_by('-start_date', 'name'),
         'registrations': registrations.order_by('-created_at'),
-        **build_notification_nav_context(request.user),
-    })
-
-
-@login_required
-def curator_dashboard(request):
-    if not is_curator_user(request.user) and not request.user.is_superuser:
-        return redirect('redirect_by_role')
-
-    tournaments = Tournament.objects.prefetch_related(
-        'tasks',
-        'jury_users',
-        'curator_users',
-        'registrations__team',
-        'registrations__members',
-    )
-    if not request.user.is_superuser:
-        tournaments = tournaments.filter(curator_users=request.user)
-    tournaments = tournaments.distinct().order_by('-start_date', 'name')
-    return render(request, 'curator_dashboard.html', {
-        'tournaments': tournaments,
-        **build_notification_nav_context(request.user),
-    })
-
-
-@login_required
-def curator_tournament_detail(request, tournament_id):
-    if not is_curator_user(request.user) and not request.user.is_superuser:
-        return redirect('redirect_by_role')
-
-    tournament = get_object_or_404(
-        Tournament.objects.prefetch_related(
-            'tasks',
-            'jury_users',
-            'curator_users',
-            'registrations__team',
-            'registrations__members',
-        ),
-        id=tournament_id,
-    )
-    if not can_view_curated_tournament(request.user, tournament):
-        return redirect('redirect_by_role')
-
-    registrations = TournamentRegistration.objects.filter(
-        tournament=tournament,
-    ).select_related('team', 'registered_by').prefetch_related('members').order_by('-created_at')
-    submissions = Submission.objects.filter(
-        task__tournament=tournament,
-    ).select_related('team', 'task').order_by('team__name', 'task__title')
-    leaderboard = build_tournament_leaderboard(tournament)
-    return render(request, 'curator_tournament_detail.html', {
-        'tournament': tournament,
-        'registrations': registrations,
-        'submissions': submissions,
-        'leaderboard': leaderboard[:10],
         **build_notification_nav_context(request.user),
     })
 
@@ -1446,7 +1380,6 @@ def download_certificate_pdf(request, certificate_id):
     can_download = (
         is_admin_user(request.user)
         or certificate.tournament.created_by_id == request.user.id
-        or certificate.tournament.curator_users.filter(id=request.user.id).exists()
         or certificate.issued_by_id == request.user.id
         or certificate.recipient_user_id == request.user.id
         or certificate.recipient_email.lower() == (request.user.email or '').lower()
@@ -1476,13 +1409,13 @@ def export_tournament_results_csv(request, tournament_id):
 
     writer = csv.writer(response)
     writer.writerow([
-        'Місце',
-        'Команда',
-        'Капітан',
-        'Середній бал',
-        'Кращий бал',
-        'Оцінених задач',
-        'Поданих робіт',
+        'РњС–СЃС†Рµ',
+        'РљРѕРјР°РЅРґР°',
+        'РљР°РїС–С‚Р°РЅ',
+        'РЎРµСЂРµРґРЅС–Р№ Р±Р°Р»',
+        'РљСЂР°С‰РёР№ Р±Р°Р»',
+        'РћС†С–РЅРµРЅРёС… Р·Р°РґР°С‡',
+        'РџРѕРґР°РЅРёС… СЂРѕР±С–С‚',
     ])
     for row in leaderboard:
         writer.writerow([
@@ -1690,7 +1623,7 @@ def participant_dashboard(request):
 
 @login_required
 def profile_view(request):
-    if request.user.role not in ['participant', 'captain'] and not request.user.is_superuser:
+    if not is_participant_user(request.user) and not request.user.is_superuser:
         return redirect('redirect_by_role')
 
     my_teams = Team.objects.filter(
@@ -1731,7 +1664,7 @@ def profile_view(request):
             else None
         )
         can_register = (
-            request.user.role in ['participant', 'captain']
+            is_participant_user(request.user)
             and tournament.is_registration_open
             and active_registration is None
         )
@@ -1769,7 +1702,7 @@ def profile_view(request):
 
 @login_required
 def my_team_view(request):
-    if request.user.role not in ['participant', 'captain'] and not request.user.is_superuser:
+    if not is_participant_user(request.user) and not request.user.is_superuser:
         return redirect('redirect_by_role')
 
     team = Team.objects.filter(
@@ -1782,7 +1715,7 @@ def my_team_view(request):
 
 @login_required
 def create_team(request):
-    if request.user.role not in ['participant', 'captain'] and not request.user.is_superuser:
+    if not is_participant_user(request.user) and not request.user.is_superuser:
         return redirect('profile')
 
     next_url = request.GET.get('next') or request.POST.get('next')
@@ -1812,7 +1745,7 @@ def create_team(request):
 
 @login_required
 def register_team_for_tournament(request, tournament_id):
-    if request.user.role not in ['participant', 'captain'] and not request.user.is_superuser:
+    if not is_participant_user(request.user) and not request.user.is_superuser:
         return redirect('redirect_by_role')
 
     tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
@@ -1846,9 +1779,6 @@ def register_team_for_tournament(request, tournament_id):
     if request.method == 'POST':
         form = TournamentRegistrationForm(request.POST, user=request.user, tournament=tournament)
         if form.is_valid():
-            if request.user.role == 'participant':
-                request.user.role = 'captain'
-                request.user.save(update_fields=['role'])
             try:
                 RegistrationService.submit_registration(
                     tournament=tournament,
@@ -1873,7 +1803,7 @@ def team_detail(request, team_id):
     team_queryset = Team.objects.select_related('captain_user').prefetch_related('registrations__tournament')
     if request.user.is_superuser:
         team = get_object_or_404(team_queryset, id=team_id)
-    elif request.user.role == 'captain':
+    elif team_queryset.filter(id=team_id, captain_user=request.user).exists():
         team = get_object_or_404(team_queryset, id=team_id, captain_user=request.user)
     else:
         team = get_object_or_404(team_queryset, id=team_id, participants__email=request.user.email)
@@ -1933,7 +1863,7 @@ def team_participants(request, team_id):
     team_queryset = Team.objects.select_related('captain_user').prefetch_related('participants')
     if request.user.is_superuser:
         team = get_object_or_404(team_queryset, id=team_id)
-    elif request.user.role == 'captain':
+    elif team_queryset.filter(id=team_id, captain_user=request.user).exists():
         team = get_object_or_404(team_queryset, id=team_id, captain_user=request.user)
     else:
         team = get_object_or_404(team_queryset, id=team_id, participants__email=request.user.email)
@@ -1959,7 +1889,7 @@ def team_participants(request, team_id):
 
 @login_required
 def add_participant(request, team_id):
-    if request.user.role != 'captain' and not request.user.is_superuser:
+    if not request.user.is_superuser and not Team.objects.filter(id=team_id, captain_user=request.user).exists():
         return redirect('redirect_by_role')
 
     team_lookup = {'id': team_id}
@@ -1984,7 +1914,7 @@ def add_participant(request, team_id):
 
 @login_required
 def delete_participant(request, team_id, participant_id):
-    if request.user.role != 'captain' and not request.user.is_superuser:
+    if not request.user.is_superuser and not Team.objects.filter(id=team_id, captain_user=request.user).exists():
         return redirect('redirect_by_role')
 
     team_lookup = {'id': team_id}
@@ -2002,7 +1932,7 @@ def delete_participant(request, team_id, participant_id):
 
 @login_required
 def delete_team(request, team_id):
-    if request.user.role != 'captain' and not request.user.is_superuser:
+    if not request.user.is_superuser and not Team.objects.filter(id=team_id, captain_user=request.user).exists():
         return redirect('redirect_by_role')
 
     team_lookup = {'id': team_id}
@@ -2143,7 +2073,7 @@ def submit_solution(request, task_id):
 
 @login_required
 def team_results(request, team_id):
-    if request.user.role not in ['participant', 'captain'] and not request.user.is_superuser:
+    if not is_participant_user(request.user) and not request.user.is_superuser:
         return redirect('redirect_by_role')
 
     team = get_object_or_404(Team, id=team_id)
@@ -2205,3 +2135,4 @@ def team_results(request, team_id):
         'result_rows': result_rows,
         'summary': summary,
     })
+

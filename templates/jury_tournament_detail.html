@@ -35,7 +35,7 @@
             </div>
             <div>
                 <a class="btn" href="{% url 'jury_dashboard' %}">Назад до турнірів</a>
-                <a class="logout" href="/logout/">Вийти</a>
+                <a class="logout" href="{% url 'logout' %}">Вийти</a>
             </div>
         </div>
 
@@ -45,8 +45,8 @@
                 <details class="team-folder">
                     <summary>{{ row.team.name }}</summary>
                     <div class="section meta">
-                        Капітан: {{ row.team.captain_name }}<br>
-                        Email: {{ row.team.captain_email }}
+                        Контактна особа: {{ row.team.captain_name }}<br>
+                        Електронна пошта: {{ row.team.captain_email }}
                     </div>
 
                     {% for row_submission in row.submissions %}
@@ -54,14 +54,8 @@
                             <div><strong>{{ row_submission.submission.task.title }}</strong></div>
                             <div class="meta links">
                                 GitHub: <a href="{{ row_submission.submission.github_link }}" target="_blank">{{ row_submission.submission.github_link }}</a><br>
-                                Video: <a href="{{ row_submission.submission.video_link }}" target="_blank">{{ row_submission.submission.video_link }}</a><br>
-                                Live demo:
-                                {% if row_submission.submission.live_demo %}
-                                    <a href="{{ row_submission.submission.live_demo }}" target="_blank">{{ row_submission.submission.live_demo }}</a>
-                                {% else %}
-                                    -
-                                {% endif %}
-                                <br>
+                                Відео: <a href="{{ row_submission.submission.video_link }}" target="_blank">{{ row_submission.submission.video_link }}</a><br>
+                                {% if row_submission.submission.live_demo %}Демо: <a href="{{ row_submission.submission.live_demo }}" target="_blank">{{ row_submission.submission.live_demo }}</a><br>{% endif %}
                                 Опис: {{ row_submission.submission.description|default:"-" }}<br>
                                 Фінальна версія: {{ row_submission.submission.is_final|yesno:"так,ні" }}<br>
                                 Подано: {{ row_submission.submission.submitted_at }}
@@ -72,19 +66,19 @@
                                     {% csrf_token %}
                                     <div class="eval-grid">
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_backend.id_for_label }}">Backend</label>
+                                            <label for="{{ row_submission.evaluation_form.score_backend.id_for_label }}">Бекенд</label>
                                             {{ row_submission.evaluation_form.score_backend }}
                                         </div>
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_frontend.id_for_label }}">Frontend</label>
+                                            <label for="{{ row_submission.evaluation_form.score_frontend.id_for_label }}">Фронтенд</label>
                                             {{ row_submission.evaluation_form.score_frontend }}
                                         </div>
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_functionality.id_for_label }}">Functionality</label>
+                                            <label for="{{ row_submission.evaluation_form.score_functionality.id_for_label }}">Функціональність</label>
                                             {{ row_submission.evaluation_form.score_functionality }}
                                         </div>
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_ux.id_for_label }}">UX</label>
+                                            <label for="{{ row_submission.evaluation_form.score_ux.id_for_label }}">UX/UI</label>
                                             {{ row_submission.evaluation_form.score_ux }}
                                         </div>
                                     </div>
@@ -109,8 +103,8 @@
                 <details class="team-folder">
                     <summary>{{ row.team.name }}</summary>
                     <div class="section meta">
-                        Капітан: {{ row.team.captain_name }}<br>
-                        Email: {{ row.team.captain_email }}
+                        Контактна особа: {{ row.team.captain_name }}<br>
+                        Електронна пошта: {{ row.team.captain_email }}
                     </div>
 
                     {% for row_submission in row.submissions %}
@@ -118,14 +112,8 @@
                             <div><strong>{{ row_submission.submission.task.title }}</strong></div>
                             <div class="meta links">
                                 GitHub: <a href="{{ row_submission.submission.github_link }}" target="_blank">{{ row_submission.submission.github_link }}</a><br>
-                                Video: <a href="{{ row_submission.submission.video_link }}" target="_blank">{{ row_submission.submission.video_link }}</a><br>
-                                Live demo:
-                                {% if row_submission.submission.live_demo %}
-                                    <a href="{{ row_submission.submission.live_demo }}" target="_blank">{{ row_submission.submission.live_demo }}</a>
-                                {% else %}
-                                    -
-                                {% endif %}
-                                <br>
+                                Відео: <a href="{{ row_submission.submission.video_link }}" target="_blank">{{ row_submission.submission.video_link }}</a><br>
+                                {% if row_submission.submission.live_demo %}Демо: <a href="{{ row_submission.submission.live_demo }}" target="_blank">{{ row_submission.submission.live_demo }}</a><br>{% endif %}
                                 Опис: {{ row_submission.submission.description|default:"-" }}<br>
                                 Фінальна версія: {{ row_submission.submission.is_final|yesno:"так,ні" }}<br>
                                 Подано: {{ row_submission.submission.submitted_at }}
@@ -136,19 +124,19 @@
                                     {% csrf_token %}
                                     <div class="eval-grid">
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_backend.id_for_label }}">Backend</label>
+                                            <label for="{{ row_submission.evaluation_form.score_backend.id_for_label }}">Бекенд</label>
                                             {{ row_submission.evaluation_form.score_backend }}
                                         </div>
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_frontend.id_for_label }}">Frontend</label>
+                                            <label for="{{ row_submission.evaluation_form.score_frontend.id_for_label }}">Фронтенд</label>
                                             {{ row_submission.evaluation_form.score_frontend }}
                                         </div>
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_functionality.id_for_label }}">Functionality</label>
+                                            <label for="{{ row_submission.evaluation_form.score_functionality.id_for_label }}">Функціональність</label>
                                             {{ row_submission.evaluation_form.score_functionality }}
                                         </div>
                                         <div>
-                                            <label for="{{ row_submission.evaluation_form.score_ux.id_for_label }}">UX</label>
+                                            <label for="{{ row_submission.evaluation_form.score_ux.id_for_label }}">UX/UI</label>
                                             {{ row_submission.evaluation_form.score_ux }}
                                         </div>
                                     </div>
@@ -160,9 +148,7 @@
                                 </form>
 
                                 {% if row_submission.my_evaluation %}
-                                    <div class="score-note">
-                                        Ваша поточна середня оцінка: {{ row_submission.my_evaluation.total_score|floatformat:1 }}
-                                    </div>
+                                    <div class="score-note">Ваша поточна оцінка: {{ row_submission.my_evaluation.total_score|floatformat:1 }}</div>
                                 {% endif %}
                             </div>
                         </div>

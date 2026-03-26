@@ -8,23 +8,19 @@
             margin: 0;
             font-family: Arial, sans-serif;
             background: #f4f6fb;
+            color: #172033;
             padding: 30px 20px;
         }
-        .wrap {
-            max-width: 760px;
-            margin: 0 auto;
-        }
+        .wrap { max-width: 760px; margin: 0 auto; }
         .card {
-            background: white;
+            background: #fff;
             padding: 28px;
-            border-radius: 16px;
-            box-shadow: 0 10px 24px rgba(0,0,0,.06);
+            border-radius: 18px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
         }
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
+        h1 { margin-top: 0; }
+        .meta { color: #64748b; line-height: 1.7; margin-bottom: 18px; }
+        label { display: block; margin-bottom: 6px; font-weight: 700; }
         input, textarea, .form-input {
             width: 100%;
             padding: 12px 14px;
@@ -32,37 +28,34 @@
             border: 1px solid #d0d7e2;
             border-radius: 10px;
             box-sizing: border-box;
+            font: inherit;
         }
-        .toolbar {
-            display: flex;
-            gap: 10px;
+        .field-errors { color: #b00020; font-size: 14px; margin: -6px 0 10px; }
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+        .button, .button-secondary {
+            display: inline-flex;
             align-items: center;
-            flex-wrap: wrap;
-            margin-top: 8px;
-        }
-        button {
-            border: none;
-            background: #16a34a;
-            color: white;
-            padding: 12px 16px;
+            justify-content: center;
+            min-height: 42px;
+            padding: 11px 16px;
             border-radius: 10px;
+            text-decoration: none;
+            border: none;
+            font-weight: 700;
             cursor: pointer;
         }
-        a {
-            color: #2563eb;
-            text-decoration: none;
-        }
-        .field-errors {
-            color: #b00020;
-            font-size: 14px;
-            margin: -6px 0 10px;
-        }
+        .button { background: #16a34a; color: white; }
+        .button-secondary { background: #eef4ff; color: #2563eb; }
     </style>
 </head>
 <body>
     <div class="wrap">
         <div class="card">
             <h1>{% if mode == 'edit' %}Редагувати команду{% else %}Створити команду{% endif %}</h1>
+            <div class="meta">
+                Контактна особа команди не є окремою роллю.
+                Це звичайний учасник, через якого організатори можуть зв'язатися з командою.
+            </div>
 
             <form method="post">
                 {% csrf_token %}
@@ -72,37 +65,35 @@
 
                 <label for="{{ form.name.id_for_label }}">Назва команди</label>
                 {{ form.name }}
-                {% if form.name.errors %}
-                    <div class="field-errors">{{ form.name.errors }}</div>
-                {% endif %}
+                {% if form.name.errors %}<div class="field-errors">{{ form.name.errors }}</div>{% endif %}
 
-                <label for="{{ form.captain_name.id_for_label }}">Ім'я капітана</label>
+                <label for="{{ form.captain_name.id_for_label }}">Ім'я контактної особи</label>
                 {{ form.captain_name }}
-                {% if form.captain_name.errors %}
-                    <div class="field-errors">{{ form.captain_name.errors }}</div>
-                {% endif %}
+                {% if form.captain_name.errors %}<div class="field-errors">{{ form.captain_name.errors }}</div>{% endif %}
 
-                <label for="{{ form.captain_email.id_for_label }}">Email капітана</label>
+                <label for="{{ form.captain_email.id_for_label }}">Електронна пошта контактної особи</label>
                 {{ form.captain_email }}
-                {% if form.captain_email.errors %}
-                    <div class="field-errors">{{ form.captain_email.errors }}</div>
-                {% endif %}
+                {% if form.captain_email.errors %}<div class="field-errors">{{ form.captain_email.errors }}</div>{% endif %}
 
                 <label for="{{ form.school.id_for_label }}">Школа</label>
                 {{ form.school }}
-                {% if form.school.errors %}
-                    <div class="field-errors">{{ form.school.errors }}</div>
-                {% endif %}
+                {% if form.school.errors %}<div class="field-errors">{{ form.school.errors }}</div>{% endif %}
 
-                <label for="{{ form.telegram.id_for_label }}">Telegram</label>
+                <label for="{{ form.telegram.id_for_label }}">Телеграм</label>
                 {{ form.telegram }}
-                {% if form.telegram.errors %}
-                    <div class="field-errors">{{ form.telegram.errors }}</div>
-                {% endif %}
+                {% if form.telegram.errors %}<div class="field-errors">{{ form.telegram.errors }}</div>{% endif %}
+
+                <label for="{{ form.discord.id_for_label }}">Діскорд</label>
+                {{ form.discord }}
+                {% if form.discord.errors %}<div class="field-errors">{{ form.discord.errors }}</div>{% endif %}
+
+                <label for="{{ form.viber.id_for_label }}">Вайбер</label>
+                {{ form.viber }}
+                {% if form.viber.errors %}<div class="field-errors">{{ form.viber.errors }}</div>{% endif %}
 
                 <div class="toolbar">
-                    <button type="submit">{% if mode == 'edit' %}Зберегти зміни{% else %}Створити команду{% endif %}</button>
-                    <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'participant_dashboard' %}{% endif %}">Назад</a>
+                    <button class="button" type="submit">{% if mode == 'edit' %}Зберегти зміни{% else %}Створити команду{% endif %}</button>
+                    <a class="button-secondary" href="{% if next_url %}{{ next_url }}{% else %}{% url 'profile' %}{% endif %}">Назад</a>
                 </div>
             </form>
         </div>

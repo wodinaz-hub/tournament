@@ -34,7 +34,7 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
             <div class="toolbar">
                 <a class="back" href="{% url 'tournament_tasks' tournament.id %}">Назад до турніру</a>
                 {% if can_export_results %}
-                    <a class="btn-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт CSV / Google Sheets</a>
+                    <a class="btn-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт ������� ����������</a>
                 {% endif %}
             </div>
             <h1 style="margin:14px 0 10px;">Лідерборд {{ tournament.name }}</h1>
@@ -69,7 +69,7 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
                         <div><span class="place">#{{ row.place }}</span></div>
                         <div>
                             <strong>{{ row.team.name }}</strong>
-                            <div class="cell-muted">Капітан: {{ row.team.captain_name }}</div>
+                        <div class="cell-muted">Контактна особа: {{ row.team.captain_name }}</div>
                         </div>
                         <div>{% if row.overall_average is not None %}{{ row.overall_average|floatformat:1 }}{% else %}-{% endif %}</div>
                         <div>{% if row.best_score is not None %}{{ row.best_score|floatformat:1 }}{% else %}-{% endif %}</div>
@@ -116,7 +116,7 @@ function renderRows(rows) {
             <div><span class="place">#${escapeHtml(row.place)}</span></div>
             <div>
                 <strong>${escapeHtml(row.team_name)}</strong>
-                <div class="cell-muted">Капітан: ${escapeHtml(row.captain_name)}</div>
+<div class="cell-muted">Контактна особа: ${escapeHtml(row.captain_name)}</div>
             </div>
             <div>${escapeHtml(formatScore(row.overall_average))}</div>
             <div>${escapeHtml(formatScore(row.best_score))}</div>
@@ -149,3 +149,8 @@ setInterval(refreshLeaderboard, 10000);
 </script>
 </body>
 </html>
+
+
+
+
+

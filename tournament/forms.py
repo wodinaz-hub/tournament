@@ -1,4 +1,4 @@
-import json
+﻿import json
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -56,7 +56,7 @@ def parse_registration_fields_definition(raw_value):
 
         parts = [part.strip() for part in line.split('|')]
         if len(parts) < 2:
-            errors.append(f'Рядок {index}: потрібно щонайменше код поля і назва.')
+            errors.append(f'Р СЏРґРѕРє {index}: РїРѕС‚СЂС–Р±РЅРѕ С‰РѕРЅР°Р№РјРµРЅС€Рµ РєРѕРґ РїРѕР»СЏ С– РЅР°Р·РІР°.')
             continue
 
         field_key = normalize_registration_field_key(parts[0], parts[1] if len(parts) > 1 else '')
@@ -65,21 +65,21 @@ def parse_registration_fields_definition(raw_value):
         is_required = (parts[3] if len(parts) > 3 and parts[3] else 'required').lower()
 
         if not field_key:
-            errors.append(f'Рядок {index}: код поля може містити лише літери, цифри та _.')
+            errors.append(f'Р СЏРґРѕРє {index}: РєРѕРґ РїРѕР»СЏ РјРѕР¶Рµ РјС–СЃС‚РёС‚Рё Р»РёС€Рµ Р»С–С‚РµСЂРё, С†РёС„СЂРё С‚Р° _.')
             continue
 
         if field_type not in REGISTRATION_FIELD_TYPE_CHOICES:
             errors.append(
-                f'Рядок {index}: невідомий тип "{field_type}". Доступно: text, textarea, email, number, url, participants.'
+                f'Р СЏРґРѕРє {index}: РЅРµРІС–РґРѕРјРёР№ С‚РёРї "{field_type}". Р”РѕСЃС‚СѓРїРЅРѕ: text, textarea, email, number, url, participants.'
             )
             continue
 
         if is_required not in {'required', 'optional'}:
-            errors.append(f'Рядок {index}: обов\'язковість має бути required або optional.')
+            errors.append(f'Р СЏРґРѕРє {index}: РѕР±РѕРІ\'СЏР·РєРѕРІС–СЃС‚СЊ РјР°С” Р±СѓС‚Рё required Р°Р±Рѕ optional.')
             continue
 
         if any(item['key'] == field_key for item in config):
-            errors.append(f'Рядок {index}: код поля "{field_key}" вже використовується.')
+            errors.append(f'Р СЏРґРѕРє {index}: РєРѕРґ РїРѕР»СЏ "{field_key}" РІР¶Рµ РІРёРєРѕСЂРёСЃС‚РѕРІСѓС”С‚СЊСЃСЏ.')
             continue
 
         config.append({
@@ -108,8 +108,8 @@ def serialize_registration_fields_definition(config):
 class TournamentForm(forms.ModelForm):
     registration_fields_definition = forms.CharField(
         required=False,
-        label='Додаткові поля анкети',
-        help_text='Кожен рядок: код_поля|Назва поля|тип|required або optional. Типи: text, textarea, email, number, url.',
+        label='Р”РѕРґР°С‚РєРѕРІС– РїРѕР»СЏ Р°РЅРєРµС‚Рё',
+        help_text='РљРѕР¶РµРЅ СЂСЏРґРѕРє: РєРѕРґ_РїРѕР»СЏ|РќР°Р·РІР° РїРѕР»СЏ|С‚РёРї|required Р°Р±Рѕ optional. РўРёРїРё: text, textarea, email, number, url.',
         widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 6}),
     )
     start_date = forms.DateTimeField(
@@ -118,7 +118,7 @@ class TournamentForm(forms.ModelForm):
             format='%Y-%m-%dT%H:%M',
             attrs={'type': 'datetime-local', 'class': 'form-input'},
         ),
-        label='Дата початку',
+        label='Р”Р°С‚Р° РїРѕС‡Р°С‚РєСѓ',
     )
     end_date = forms.DateTimeField(
         input_formats=['%Y-%m-%dT%H:%M'],
@@ -126,7 +126,7 @@ class TournamentForm(forms.ModelForm):
             format='%Y-%m-%dT%H:%M',
             attrs={'type': 'datetime-local', 'class': 'form-input'},
         ),
-        label='Дата завершення',
+        label='Р”Р°С‚Р° Р·Р°РІРµСЂС€РµРЅРЅСЏ',
     )
     registration_start = forms.DateTimeField(
         input_formats=['%Y-%m-%dT%H:%M'],
@@ -134,7 +134,7 @@ class TournamentForm(forms.ModelForm):
             format='%Y-%m-%dT%H:%M',
             attrs={'type': 'datetime-local', 'class': 'form-input'},
         ),
-        label='Початок реєстрації',
+        label='РџРѕС‡Р°С‚РѕРє СЂРµС”СЃС‚СЂР°С†С–С—',
     )
     registration_end = forms.DateTimeField(
         input_formats=['%Y-%m-%dT%H:%M'],
@@ -142,7 +142,7 @@ class TournamentForm(forms.ModelForm):
             format='%Y-%m-%dT%H:%M',
             attrs={'type': 'datetime-local', 'class': 'form-input'},
         ),
-        label='Завершення реєстрації',
+        label='Р—Р°РІРµСЂС€РµРЅРЅСЏ СЂРµС”СЃС‚СЂР°С†С–С—',
     )
 
     class Meta:
@@ -160,7 +160,6 @@ class TournamentForm(forms.ModelForm):
             'max_team_members',
             'max_teams',
             'jury_users',
-            'curator_users',
             'is_draft',
         ]
         widgets = {
@@ -171,7 +170,6 @@ class TournamentForm(forms.ModelForm):
             'max_team_members': forms.NumberInput(attrs={'class': 'form-input', 'min': 1}),
             'max_teams': forms.NumberInput(attrs={'class': 'form-input'}),
             'jury_users': forms.SelectMultiple(attrs={'class': 'form-input', 'size': 6}),
-            'curator_users': forms.SelectMultiple(attrs={'class': 'form-input', 'size': 6}),
             'is_draft': forms.CheckboxInput(),
         }
 
@@ -191,15 +189,10 @@ class TournamentForm(forms.ModelForm):
             'min_team_members',
             'max_team_members',
             'jury_users',
-            'curator_users',
         ]:
             self.fields[field_name].required = False
         self.fields['jury_users'].queryset = CustomUser.objects.filter(
             role='jury',
-            is_approved=True,
-        ).order_by('username')
-        self.fields['curator_users'].queryset = CustomUser.objects.filter(
-            role='curator',
             is_approved=True,
         ).order_by('username')
 
@@ -240,23 +233,23 @@ class TournamentForm(forms.ModelForm):
         }
         for field_name, value in required_fields.items():
             if value in [None, '']:
-                self.add_error(field_name, 'Це поле є обов’язковим для опублікованого турніру.')
+                self.add_error(field_name, 'Р¦Рµ РїРѕР»Рµ С” РѕР±РѕРІвЂ™СЏР·РєРѕРІРёРј РґР»СЏ РѕРїСѓР±Р»С–РєРѕРІР°РЅРѕРіРѕ С‚СѓСЂРЅС–СЂСѓ.')
 
         if registration_start and registration_end and registration_start >= registration_end:
-            self.add_error('registration_end', 'Завершення реєстрації має бути пізніше за початок реєстрації.')
+            self.add_error('registration_end', 'Р—Р°РІРµСЂС€РµРЅРЅСЏ СЂРµС”СЃС‚СЂР°С†С–С— РјР°С” Р±СѓС‚Рё РїС–Р·РЅС–С€Рµ Р·Р° РїРѕС‡Р°С‚РѕРє СЂРµС”СЃС‚СЂР°С†С–С—.')
 
         if registration_end and start_date and registration_end > start_date:
-            self.add_error('registration_end', 'Реєстрація має завершуватися до початку турніру.')
+            self.add_error('registration_end', 'Р РµС”СЃС‚СЂР°С†С–СЏ РјР°С” Р·Р°РІРµСЂС€СѓРІР°С‚РёСЃСЏ РґРѕ РїРѕС‡Р°С‚РєСѓ С‚СѓСЂРЅС–СЂСѓ.')
 
         if start_date and end_date and end_date <= start_date:
-            self.add_error('end_date', 'Турнір має завершуватися після початку.')
+            self.add_error('end_date', 'РўСѓСЂРЅС–СЂ РјР°С” Р·Р°РІРµСЂС€СѓРІР°С‚РёСЃСЏ РїС–СЃР»СЏ РїРѕС‡Р°С‚РєСѓ.')
 
         if (
             min_team_members is not None
             and max_team_members is not None
             and min_team_members > max_team_members
         ):
-            self.add_error('max_team_members', 'Максимальна кількість людей у команді має бути не меншою за мінімальну.')
+            self.add_error('max_team_members', 'РњР°РєСЃРёРјР°Р»СЊРЅР° РєС–Р»СЊРєС–СЃС‚СЊ Р»СЋРґРµР№ Сѓ РєРѕРјР°РЅРґС– РјР°С” Р±СѓС‚Рё РЅРµ РјРµРЅС€РѕСЋ Р·Р° РјС–РЅС–РјР°Р»СЊРЅСѓ.')
 
         return cleaned_data
 
@@ -272,13 +265,15 @@ class TournamentForm(forms.ModelForm):
 class TeamForm(forms.ModelForm):
     class Meta:
         model = Team
-        fields = ['name', 'captain_name', 'captain_email', 'school', 'telegram']
+        fields = ['name', 'captain_name', 'captain_email', 'school', 'telegram', 'discord', 'viber']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-input'}),
             'captain_name': forms.TextInput(attrs={'class': 'form-input'}),
             'captain_email': forms.EmailInput(attrs={'class': 'form-input'}),
             'school': forms.TextInput(attrs={'class': 'form-input'}),
             'telegram': forms.TextInput(attrs={'class': 'form-input'}),
+            'discord': forms.TextInput(attrs={'class': 'form-input'}),
+            'viber': forms.TextInput(attrs={'class': 'form-input'}),
         }
 
 
@@ -307,11 +302,11 @@ class TournamentRegistrationForm(forms.Form):
             widget=forms.TextInput(attrs={'class': 'form-input'}),
         )
         self.fields['captain_name'] = forms.CharField(
-            label="Ім'я капітана",
+            label="Ім'я контактної особи",
             widget=forms.TextInput(attrs={'class': 'form-input'}),
         )
         self.fields['captain_email'] = forms.EmailField(
-            label='Email капітана',
+            label='Електронна пошта контактної особи',
             widget=forms.EmailInput(attrs={'class': 'form-input'}),
         )
         self.fields['school'] = forms.CharField(
@@ -321,7 +316,17 @@ class TournamentRegistrationForm(forms.Form):
         )
         self.fields['telegram'] = forms.CharField(
             required=False,
-            label='Telegram',
+            label='Телеграм',
+            widget=forms.TextInput(attrs={'class': 'form-input'}),
+        )
+        self.fields['discord'] = forms.CharField(
+            required=False,
+            label='Діскорд',
+            widget=forms.TextInput(attrs={'class': 'form-input'}),
+        )
+        self.fields['viber'] = forms.CharField(
+            required=False,
+            label='Вайбер',
             widget=forms.TextInput(attrs={'class': 'form-input'}),
         )
 
@@ -331,6 +336,8 @@ class TournamentRegistrationForm(forms.Form):
             self.fields['captain_email'].initial = existing_team.captain_email
             self.fields['school'].initial = existing_team.school
             self.fields['telegram'].initial = existing_team.telegram
+            self.fields['discord'].initial = existing_team.discord
+            self.fields['viber'].initial = existing_team.viber
         elif user is not None:
             self.fields['captain_name'].initial = user.username
             self.fields['captain_email'].initial = user.email
@@ -388,13 +395,15 @@ class TournamentRegistrationForm(forms.Form):
         cleaned_data['captain_email'] = (cleaned_data.get('captain_email') or '').strip().lower()
         cleaned_data['school'] = (cleaned_data.get('school') or '').strip()
         cleaned_data['telegram'] = (cleaned_data.get('telegram') or '').strip()
+        cleaned_data['discord'] = (cleaned_data.get('discord') or '').strip()
+        cleaned_data['viber'] = (cleaned_data.get('viber') or '').strip()
 
         if not cleaned_data['team_name']:
             self.add_error('team_name', 'Вкажіть назву команди.')
         if not cleaned_data['captain_name']:
-            self.add_error('captain_name', 'Вкажіть імʼя капітана.')
+            self.add_error('captain_name', "Вкажіть ім'я контактної особи.")
         if not cleaned_data['captain_email']:
-            self.add_error('captain_email', 'Вкажіть email капітана.')
+            self.add_error('captain_email', 'Вкажіть електронну пошту контактної особи.')
 
         for field_config in (self.tournament.registration_fields_config if self.tournament else []):
             if field_config['type'] != 'participants':
@@ -421,13 +430,13 @@ class TournamentRegistrationForm(forms.Form):
             participants = []
             for index, item in enumerate(payload, start=1):
                 if not isinstance(item, dict):
-                    self.add_error(field_name, 'Кожен учасник має містити ім\'я та email.')
+                    self.add_error(field_name, "Кожен учасник має містити ім'я та email.")
                     continue
 
                 full_name = (item.get('full_name') or '').strip()
                 email = (item.get('email') or '').strip().lower()
                 if not full_name:
-                    self.add_error(field_name, f'Учасник {index}: вкажіть ім\'я.')
+                    self.add_error(field_name, f"Учасник {index}: вкажіть ім'я.")
                 if not email:
                     self.add_error(field_name, f'Учасник {index}: вкажіть email.')
                 else:
@@ -449,7 +458,7 @@ class TournamentRegistrationForm(forms.Form):
                 self.add_error(field_name, 'Email не повинен повторюватися в межах однієї команди.')
 
             if cleaned_data.get('captain_email') and cleaned_data['captain_email'] in participant_emails:
-                self.add_error(field_name, 'Email капітана не може дублюватися серед учасників.')
+                self.add_error(field_name, 'Email контактної особи не може дублюватися серед учасників.')
 
             total_members = 1 + len(participants)
             if self.tournament.min_team_members is not None and total_members < self.tournament.min_team_members:
@@ -474,6 +483,8 @@ class TournamentRegistrationForm(forms.Form):
             'captain_email': self.cleaned_data['captain_email'],
             'school': self.cleaned_data.get('school', ''),
             'telegram': self.cleaned_data.get('telegram', ''),
+            'discord': self.cleaned_data.get('discord', ''),
+            'viber': self.cleaned_data.get('viber', ''),
         }
 
     def cleaned_form_answers(self):
@@ -546,7 +557,7 @@ class TaskForm(forms.ModelForm):
         }
         for field_name, value in required_fields.items():
             if not value:
-                self.add_error(field_name, 'Це поле є обов’язковим для опублікованого завдання.')
+                self.add_error(field_name, 'Р¦Рµ РїРѕР»Рµ С” РѕР±РѕРІвЂ™СЏР·РєРѕРІРёРј РґР»СЏ РѕРїСѓР±Р»С–РєРѕРІР°РЅРѕРіРѕ Р·Р°РІРґР°РЅРЅСЏ.')
 
         return cleaned_data
 
@@ -606,7 +617,7 @@ class AnnouncementForm(forms.ModelForm):
         self.fields['tournament'].required = not allow_global
         self.fields['tournament'].queryset = tournament_queryset
         if allow_global:
-            self.fields['tournament'].empty_label = 'Усі турніри / загальне оголошення'
+            self.fields['tournament'].empty_label = 'РЈСЃС– С‚СѓСЂРЅС–СЂРё / Р·Р°РіР°Р»СЊРЅРµ РѕРіРѕР»РѕС€РµРЅРЅСЏ'
 class CertificateTemplateForm(forms.ModelForm):
     class Meta:
         model = CertificateTemplate
@@ -624,4 +635,7 @@ class CertificateTemplateForm(forms.ModelForm):
         self.fields['tournament'].required = not allow_global
         self.fields['tournament'].queryset = tournament_queryset
         if allow_global:
-            self.fields['tournament'].empty_label = 'Глобальний шаблон для всіх турнірів'
+            self.fields['tournament'].empty_label = 'Р“Р»РѕР±Р°Р»СЊРЅРёР№ С€Р°Р±Р»РѕРЅ РґР»СЏ РІСЃС–С… С‚СѓСЂРЅС–СЂС–РІ'
+
+
+

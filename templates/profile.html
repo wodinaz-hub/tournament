@@ -55,8 +55,8 @@
         <h2>Профіль</h2>
         <div class="meta">
             Логін: {{ profile_user.username }}<br>
-            Email: {{ profile_user.email }}<br>
-            Роль: {{ profile_user.role }}
+            Електронна пошта: {{ profile_user.email }}<br>
+            Роль: {{ profile_user.get_role_display }}
         </div>
     </div>
 
@@ -66,7 +66,7 @@
             {% for team in my_teams %}
                 <div class="item">
                     <strong>{{ team.name }}</strong>
-                    <div class="meta">Капітан: {{ team.captain_name }}</div>
+                    <div class="meta">Контактна особа: {{ team.captain_name }}</div>
                     <div class="action-row">
                         <a class="btn" href="{% url 'team_detail' team.id %}">Відкрити</a>
                         <a class="btn-green" href="{% url 'team_results' team.id %}">Результати</a>
@@ -92,7 +92,7 @@
                 {% if item.my_registration and item.my_registration.status == "approved" %}
                     <div class="message ok">Заявку схвалено. Команда допущена до турніру.</div>
                 {% elif item.my_registration and item.my_registration.status == "pending" %}
-                    <div class="message warn">Заявку подано. Очікується рішення організатора. Завдання відкриються після схвалення заявки.</div>
+                    <div class="message warn">Заявку подано. Очікується рішення організатора.</div>
                 {% elif item.my_registration and item.my_registration.status == "rejected" %}
                     <div class="message bad">Попередню заявку відхилено.</div>
                 {% endif %}

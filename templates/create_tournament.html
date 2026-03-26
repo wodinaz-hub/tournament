@@ -165,7 +165,7 @@
             <div class="page-header">
                 <div>
                     <h1>{% if mode == 'edit' %}Редагувати турнір{% else %}Створити турнір{% endif %}</h1>
-                    <div class="page-subtitle">Налаштуй параметри турніру, анкету реєстрації, журі, кураторів і завдання в одному місці.</div>
+                    <div class="page-subtitle">***? **?? ***?? * **?, ***?? *?, **? ***?? ?? *?? *?.</div>
                 </div>
                 <a class="back-link" href="{{ dashboard_url|default:'/dashboard/tournaments/active/' }}">Назад до кабінету</a>
             </div>
@@ -200,11 +200,6 @@
                                 {{ form.jury_users }}
                                 {% if form.jury_users.errors %}<div class="field-errors">{{ form.jury_users.errors }}</div>{% endif %}
                             </div>
-                            <div class="field-group field-span-2">
-                                <label>Куратори турніру</label>
-                                {{ form.curator_users }}
-                                {% if form.curator_users.errors %}<div class="field-errors">{{ form.curator_users.errors }}</div>{% endif %}
-                            </div>
                         </div>
                     </section>
 
@@ -213,7 +208,7 @@
                             <h2 class="section-title">Поля анкети</h2>
                             <button type="button" class="btn-ghost" id="add-field">Додати поле</button>
                         </div>
-                        <p class="section-note">Тут додаються додаткові поля, які капітан заповнює під час подачі заявки на турнір.</p>
+            <p class="section-note">Тут додаються додаткові поля, які контактна особа команди заповнює під час подачі заявки на турнір.</p>
                         <div class="builder">
                             <div id="registration-fields-builder"></div>
                             <div id="builder-empty" class="empty">Поки що додаткових полів немає.</div>
@@ -315,7 +310,7 @@
                 <select class="builder-type">
                     <option value="text">Короткий текст</option>
                     <option value="textarea">Великий текст</option>
-                    <option value="email">Email</option>
+                    <option value="email">���������� �����</option>
                     <option value="number">Число</option>
                     <option value="url">Посилання</option>
                     <option value="participants">Учасники</option>
@@ -411,3 +406,7 @@
     </script>
 </body>
 </html>
+
+
+
+

@@ -1,4 +1,4 @@
-from django import forms
+﻿from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from .models import CustomUser
 
@@ -19,22 +19,22 @@ class UniqueEmailMixin:
 
 class RegisterForm(UniqueEmailMixin, UserCreationForm):
     username = forms.CharField(
-        label='Username',
+        label='Логін',
         widget=forms.TextInput(attrs={'class': 'form-input'})
     )
 
     email = forms.EmailField(
-        label='Email',
+        label='Електронна пошта',
         widget=forms.EmailInput(attrs={'class': 'form-input'})
     )
 
     password1 = forms.CharField(
-        label='Password',
+        label='Пароль',
         widget=forms.PasswordInput(attrs={'class': 'form-input'})
     )
 
     password2 = forms.CharField(
-        label='Confirm password',
+        label='Підтвердження пароля',
         widget=forms.PasswordInput(attrs={'class': 'form-input'})
     )
 
@@ -46,40 +46,40 @@ class RegisterForm(UniqueEmailMixin, UserCreationForm):
 class LoginForm(AuthenticationForm):
 
     username = forms.CharField(
-        label='Username',
+        label='Логін',
         widget=forms.TextInput(attrs={'class': 'form-input'})
     )
 
     password = forms.CharField(
-        label='Password',
+        label='Пароль',
         widget=forms.PasswordInput(attrs={'class': 'form-input'})
     )
 
 
 class AdminCreateUserForm(UniqueEmailMixin, UserCreationForm):
     username = forms.CharField(
-        label='Username',
+        label='Логін',
         widget=forms.TextInput(attrs={'class': 'form-input'})
     )
 
     email = forms.EmailField(
-        label='Email',
+        label='Електронна пошта',
         widget=forms.EmailInput(attrs={'class': 'form-input'})
     )
 
     role = forms.ChoiceField(
-        label='Role',
+        label='Роль',
         choices=CustomUser.ROLE_CHOICES,
         widget=forms.Select(attrs={'class': 'form-input'})
     )
 
     password1 = forms.CharField(
-        label='Password',
+        label='Пароль',
         widget=forms.PasswordInput(attrs={'class': 'form-input'})
     )
 
     password2 = forms.CharField(
-        label='Confirm password',
+        label='Підтвердження пароля',
         widget=forms.PasswordInput(attrs={'class': 'form-input'})
     )
 
@@ -95,3 +95,4 @@ class AdminCreateUserForm(UniqueEmailMixin, UserCreationForm):
                 choice for choice in CustomUser.ROLE_CHOICES
                 if choice[0] in available_roles
             ]
+

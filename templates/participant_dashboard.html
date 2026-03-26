@@ -109,7 +109,7 @@ body {
             {% for team in my_teams %}
                 <div class="item">
                     <strong>{{ team.name }}</strong>
-                    <div class="meta">Капітан: {{ team.captain_name }}</div>
+                    <div class="meta">Контактна особа: {{ team.captain_name }}</div>
                     <div class="action-row">
                         <a class="btn" href="/team/{{ team.id }}/">Відкрити</a>
                         <a class="btn btn-green" href="/team/{{ team.id }}/results/">Результати</a>
@@ -118,7 +118,7 @@ body {
             {% endfor %}
         {% else %}
             <p>У вас ще немає команди.</p>
-            {% if request.user.role == "captain" %}
+            {% if request.user.role == "participant" %}
                 <a class="btn btn-green" href="/create-team/">Створити команду</a>
             {% endif %}
         {% endif %}
@@ -142,7 +142,7 @@ body {
                     <div class="message warn">Заявку подано. Очікується рішення організатора.</div>
                 {% elif item.my_registration and item.my_registration.status == "rejected" %}
                     <div class="message bad">Попередню заявку відхилено.</div>
-                {% elif request.user.role == "captain" and not item.can_register %}
+                {% elif request.user.role == "participant" and not item.can_register %}
                     <div class="message">Реєстрація зараз недоступна.</div>
                 {% endif %}
 
@@ -195,3 +195,7 @@ body {
 
 </body>
 </html>
+
+
+
+

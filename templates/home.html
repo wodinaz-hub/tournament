@@ -368,7 +368,7 @@
                                     <a href="{% url 'admin_certificates' %}">Сертифікати</a>
                                 </div>
                             </details>
-                        {% elif request.user.role == 'participant' or request.user.role == 'captain' %}
+                        {% elif request.user.role == 'participant' %}
                             <a class="button-secondary" href="{% url 'profile' %}">Профіль</a>
                             <a class="button-secondary" href="{% url 'my_team' %}">Моя команда</a>
                         {% elif request.user.role == 'jury' %}
@@ -376,8 +376,6 @@
                         {% elif request.user.role == 'organizer' %}
                             <a class="button-secondary" href="{% url 'organizer_dashboard' %}">Мої турніри</a>
                             <a class="button-secondary" href="{% url 'create_tournament' %}">Створити турнір</a>
-                        {% elif request.user.role == 'curator' %}
-                            <a class="button-secondary" href="{% url 'curator_dashboard' %}">Куратор</a>
                         {% endif %}
                     </div>
                     <a class="button" href="{% url 'logout' %}">Вийти</a>
@@ -562,3 +560,7 @@
     </script>
 </body>
 </html>
+
+
+
+

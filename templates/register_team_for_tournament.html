@@ -43,7 +43,7 @@
                     Розмір команди:
                     {% if tournament.min_team_members %}від {{ tournament.min_team_members }}{% else %}без мінімуму{% endif %}
                     {% if tournament.max_team_members %} до {{ tournament.max_team_members }}{% else %} і більше{% endif %}
-                    людей разом із капітаном.
+                    людей разом із контактною особою.
                 {% endif %}
             </div>
 
@@ -59,11 +59,11 @@
                 {{ form.team_name }}
                 {% if form.team_name.errors %}<div class="field-errors">{{ form.team_name.errors }}</div>{% endif %}
 
-                <label for="{{ form.captain_name.id_for_label }}">Ім'я капітана</label>
+                <label for="{{ form.captain_name.id_for_label }}">Ім'я контактної особи</label>
                 {{ form.captain_name }}
                 {% if form.captain_name.errors %}<div class="field-errors">{{ form.captain_name.errors }}</div>{% endif %}
 
-                <label for="{{ form.captain_email.id_for_label }}">Email капітана</label>
+                <label for="{{ form.captain_email.id_for_label }}">Електронна пошта контактної особи</label>
                 {{ form.captain_email }}
                 {% if form.captain_email.errors %}<div class="field-errors">{{ form.captain_email.errors }}</div>{% endif %}
 
@@ -71,14 +71,22 @@
                 {{ form.school }}
                 {% if form.school.errors %}<div class="field-errors">{{ form.school.errors }}</div>{% endif %}
 
-                <label for="{{ form.telegram.id_for_label }}">Telegram</label>
+                <label for="{{ form.telegram.id_for_label }}">Телеграм</label>
                 {{ form.telegram }}
                 {% if form.telegram.errors %}<div class="field-errors">{{ form.telegram.errors }}</div>{% endif %}
+
+                <label for="{{ form.discord.id_for_label }}">Діскорд</label>
+                {{ form.discord }}
+                {% if form.discord.errors %}<div class="field-errors">{{ form.discord.errors }}</div>{% endif %}
+
+                <label for="{{ form.viber.id_for_label }}">Вайбер</label>
+                {{ form.viber }}
+                {% if form.viber.errors %}<div class="field-errors">{{ form.viber.errors }}</div>{% endif %}
 
                 {% if tournament.registration_fields_config %}
                     <h2 class="section-title">Анкета</h2>
                     {% for field in form %}
-                        {% if field.name != "team_name" and field.name != "captain_name" and field.name != "captain_email" and field.name != "school" and field.name != "telegram" %}
+                        {% if field.name != "team_name" and field.name != "captain_name" and field.name != "captain_email" and field.name != "school" and field.name != "telegram" and field.name != "discord" and field.name != "viber" %}
                             <div class="field-card">
                                 <label for="{{ field.id_for_label }}">
                                     {{ field.label }}
@@ -89,14 +97,14 @@
                                     {{ field }}
                                     <div class="participants-wrap" data-target-id="{{ field.auto_id }}" data-min-members="{{ field.field.widget.attrs.data_min_members }}" data-max-members="{{ field.field.widget.attrs.data_max_members }}">
                                         <div class="participant-summary">
-                                            Капітан уже входить до команди. Тут додай інших учасників.
+                                            Контактна особа вже входить до команди. Тут додай інших учасників.
                                         </div>
                                         <div class="participant-meta">
                                             {% if tournament.min_team_members or tournament.max_team_members %}
                                                 Потрібно додати
                                                 {% if tournament.min_team_members %}щонайменше {{ tournament.min_team_members|add:"-1" }}{% else %}0{% endif %}
                                                 {% if tournament.max_team_members %} і не більше {{ tournament.max_team_members|add:"-1" }}{% else %} і більше{% endif %}
-                                                учасників без капітана.
+                                                учасників без контактної особи.
                                             {% endif %}
                                         </div>
                                         <div class="participants-list"></div>
@@ -116,12 +124,12 @@
 
                 <div class="toolbar">
                     <button type="submit">Надіслати заявку</button>
-                    <a href="/participant-dashboard/">Назад</a>
+                    <a href="{% url 'profile' %}">Назад</a>
                 </div>
             </form>
 
             {% if not tournament.registration_fields_config %}
-                <div class="empty" style="margin-top:18px;">Організатор ще не додав додаткових полів анкети. Зараз заявка містить лише вибір команди.</div>
+                <div class="empty" style="margin-top:18px;">Організатор ще не додав додаткових полів анкети.</div>
             {% endif %}
         </div>
     </div>
@@ -134,7 +142,7 @@
                     <input type="text" class="participant-name" placeholder="ПІБ">
                 </div>
                 <div>
-                    <label>Email учасника</label>
+                    <label>Електронна пошта учасника</label>
                     <input type="email" class="participant-email" placeholder="name@example.com">
                 </div>
                 <div>

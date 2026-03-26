@@ -34,7 +34,7 @@
         <div>
             <h1 style="margin:0 0 6px;">Сертифікати</h1>
             <div class="meta">
-                Адміністратор може завантажити шаблон сертифіката, згенерувати іменні PDF та експортувати результати турніру у CSV, який відкривається в Google Sheets.
+                Адміністратор може завантажити шаблон сертифіката, згенерувати іменні PDF та експортувати результати турніру у CSV, який відкривається в Google �������.
             </div>
         </div>
         <div class="actions">
@@ -94,7 +94,7 @@
                 <div class="item-top">
                     <strong>{{ tournament.name }}</strong>
                     <div class="actions">
-                        <a class="btn-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт CSV / Google Sheets</a>
+                        <a class="btn-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт ������� ����������</a>
                         <form method="post" action="{% url 'issue_participant_certificates' tournament.id %}">
                             {% csrf_token %}
                             <button class="btn" type="submit">Сертифікати учасників</button>
@@ -128,7 +128,7 @@
                 </div>
                 <div class="meta">
                     Турнір: {{ certificate.tournament.name }}<br>
-                    Email: {{ certificate.recipient_email }}<br>
+                    ���������� �����: {{ certificate.recipient_���������� ����� }}<br>
                     {% if certificate.team %}Команда: {{ certificate.team.name }}<br>{% endif %}
                     Видав: {{ certificate.issued_by.username }}<br>
                     Дата: {{ certificate.issued_at }}
@@ -141,3 +141,8 @@
 </div>
 </body>
 </html>
+
+
+
+
+

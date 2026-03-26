@@ -284,7 +284,7 @@
                                 {{ user.username }}
                                 <span class="role-badge role-{{ user.role }}">{{ user.role }}</span>
                             </div>
-                            <div class="meta">Email: {{ user.email|default:"-" }}</div>
+                            <div class="meta">���������� �����: {{ user.email|default:"-" }}</div>
                             <div class="actions">
                                 <form class="inline-form" method="post" action="{% url 'approve_user' user.id %}">
                                     {% csrf_token %}
@@ -315,7 +315,7 @@
                                 {% endif %}
                             </div>
                             <div class="meta">
-                                Email: {{ user.email|default:"-" }}<br>
+                                ���������� �����: {{ user.email|default:"-" }}<br>
                                 {% if user.is_superuser %}Суперкористувач{% else %}Звичайний користувач{% endif %}
                             </div>
                             <div class="actions">
@@ -499,10 +499,10 @@
                         <div class="name">{{ team.name }}</div>
                         <div class="meta">
                             Капітан: {{ team.captain_name }}<br>
-                            Email: {{ team.captain_email }}<br>
+                            ���������� �����: {{ team.captain_email }}<br>
                             Користувач-капітан: {% if team.captain_user %}{{ team.captain_user.username }}{% else %}-{% endif %}<br>
                             Школа: {{ team.school|default:"-" }}<br>
-                            Telegram: {{ team.telegram|default:"-" }}
+                            ��������: {{ team.telegram|default:"-" }}
                         </div>
                         <div class="team-links">
                             <a class="button" href="{% url 'team_detail' team.id %}">Відкрити команду</a>
@@ -586,7 +586,7 @@
                                 -
                             {% endif %}
                             <br>
-                            Live demo:
+                            ����:
                             {% if submission.live_demo %}
                                 <a href="{{ submission.live_demo }}" target="_blank">{{ submission.live_demo }}</a>
                             {% else %}
@@ -605,3 +605,7 @@
     </div>
 </body>
 </html>
+
+
+
+

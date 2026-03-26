@@ -91,21 +91,23 @@ class RegistrationService:
         captain_email = (team_data.get("captain_email") or "").strip().lower()
         school = (team_data.get("school") or "").strip()
         telegram = (team_data.get("telegram") or "").strip()
+        discord = (team_data.get("discord") or "").strip()
+        viber = (team_data.get("viber") or "").strip()
 
         if not team_name:
             raise ValidationError("Вкажіть назву команди.")
         if not captain_name:
-            raise ValidationError("Вкажіть ім'я капітана.")
+            raise ValidationError("Вкажіть ім'я контактної особи.")
         if not captain_email:
-            raise ValidationError("Вкажіть email капітана.")
+            raise ValidationError("Вкажіть email контактної особи.")
         try:
             validate_email(captain_email)
         except ValidationError as exc:
-            raise ValidationError("Некоректний формат email капітана.") from exc
+            raise ValidationError("Некоректний формат email контактної особи.") from exc
 
         normalized_roster = RegistrationService._normalize_roster(roster)
         if captain_email in {item["email"] for item in normalized_roster}:
-            raise ValidationError("Email капітана не може дублюватися серед учасників.")
+            raise ValidationError("Email контактної особи не може дублюватися серед учасників.")
 
         if team is None:
             team = Team.objects.create(
@@ -115,6 +117,8 @@ class RegistrationService:
                 captain_email=captain_email,
                 school=school or None,
                 telegram=telegram or None,
+                discord=discord or None,
+                viber=viber or None,
             )
         else:
             team.name = team_name
@@ -122,12 +126,16 @@ class RegistrationService:
             team.captain_email = captain_email
             team.school = school or None
             team.telegram = telegram or None
+            team.discord = discord or None
+            team.viber = viber or None
             team.save(update_fields=[
                 "name",
                 "captain_name",
                 "captain_email",
                 "school",
                 "telegram",
+                "discord",
+                "viber",
             ])
 
         if TournamentRegistration.objects.filter(

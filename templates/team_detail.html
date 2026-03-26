@@ -4,196 +4,51 @@
 <meta charset="UTF-8">
 <title>{{ team.name }}</title>
 <style>
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: linear-gradient(180deg, #eef4ff 0%, #f7f9fc 100%);
-    padding: 30px 20px;
-    color: #172033;
-}
-.wrap {
-    max-width: 1040px;
-    margin: 0 auto;
-}
-.hero,
-.card {
-    background: white;
-    padding: 24px;
-    border-radius: 18px;
-    box-shadow: 0 14px 32px rgba(17, 24, 39, 0.08);
-    margin-bottom: 20px;
-    border: 1px solid #dbe3ee;
-}
-.hero {
-    display: grid;
-    grid-template-columns: 1.3fr 0.7fr;
-    gap: 18px;
-}
-.hero h1 {
-    margin: 0 0 12px;
-}
-.muted {
-    color: #64748b;
-    line-height: 1.6;
-}
-.stats {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-}
-.stat {
-    background: #f8fbff;
-    border: 1px solid #dbe7f3;
-    border-radius: 14px;
-    padding: 14px;
-}
-.stat-label {
-    color: #64748b;
-    font-size: 14px;
-}
-.stat-value {
-    margin-top: 6px;
-    font-size: 24px;
-    font-weight: 700;
-}
-.btn,
-.back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-    padding: 8px 12px;
-    border-radius: 9px;
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-    min-height: 36px;
-    line-height: 1.2;
-    font-weight: 600;
-    box-sizing: border-box;
-    white-space: nowrap;
-    vertical-align: top;
-}
-.btn {
-    color: white;
-    background: #2563eb;
-}
-.btn-green {
-    background: #16a34a;
-}
-.btn-red {
-    background: #dc2626;
-}
-.back {
-    color: #2563eb;
-    background: #eef4ff;
-}
-.actions {
-    margin-top: 18px;
-    display: flex;
-    gap: 10px;
-    align-items: stretch;
-    flex-wrap: wrap;
-}
-.actions form {
-    margin: 0;
-    display: flex;
-    align-items: stretch;
-}
-.section-title {
-    margin: 0 0 16px;
-}
-.item {
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 12px;
-    background: #fbfdff;
-}
-.name {
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-.links a {
-    color: #2563eb;
-    text-decoration: none;
-    word-break: break-all;
-}
-.inline-form {
-    border: 1px solid #dbe7f3;
-    background: #f8fbff;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 18px;
-}
-.inline-form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: 10px;
-    align-items: end;
-}
-.inline-form label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 600;
-}
-.inline-form input {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #d0d7e2;
-    border-radius: 10px;
-    font-size: 14px;
-}
-.hint {
-    color: #64748b;
-    font-size: 14px;
-    margin-bottom: 12px;
-}
-.notice {
-    margin-top: 16px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    border: 1px solid #f8d7a7;
-    background: #fff7e8;
-    color: #8a5a00;
-    line-height: 1.5;
-}
-.quick-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-}
-.quick-card {
-    background: #f8fbff;
-    border: 1px solid #dbe7f3;
-    border-radius: 14px;
-    padding: 14px;
-}
-@media (max-width: 820px) {
-    .quick-grid {
-        grid-template-columns: 1fr;
-    }
-}
-@media (max-width: 820px) {
-    .hero,
-    .inline-form-grid {
-        grid-template-columns: 1fr;
-    }
-}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#eef4ff 0%,#f7f9fc 100%);padding:30px 20px;color:#172033;}
+.wrap{max-width:1040px;margin:0 auto;}
+.hero,.card{background:white;padding:24px;border-radius:18px;box-shadow:0 14px 32px rgba(17,24,39,.08);margin-bottom:20px;border:1px solid #dbe3ee;}
+.hero{display:grid;grid-template-columns:1.3fr .7fr;gap:18px;}
+.hero h1{margin:0 0 12px;}
+.muted{color:#64748b;line-height:1.6;}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.stat{background:#f8fbff;border:1px solid #dbe7f3;border-radius:14px;padding:14px;}
+.stat-label{color:#64748b;font-size:14px;}
+.stat-value{margin-top:6px;font-size:24px;font-weight:700;}
+.btn,.back{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;padding:8px 12px;border-radius:9px;border:none;cursor:pointer;font-size:13px;min-height:36px;line-height:1.2;font-weight:600;box-sizing:border-box;white-space:nowrap;vertical-align:top;}
+.btn{color:white;background:#2563eb;}
+.btn-green{background:#16a34a;color:white;}
+.btn-red{background:#dc2626;color:white;}
+.back{color:#2563eb;background:#eef4ff;}
+.actions{margin-top:18px;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;}
+.actions form{margin:0;display:flex;align-items:stretch;}
+.section-title{margin:0 0 16px;}
+.item{border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:12px;background:#fbfdff;}
+.name{font-weight:700;margin-bottom:8px;}
+.links a{color:#2563eb;text-decoration:none;word-break:break-all;}
+.inline-form{border:1px solid #dbe7f3;background:#f8fbff;border-radius:14px;padding:16px;margin-bottom:18px;}
+.inline-form-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;}
+.inline-form label{display:block;margin-bottom:6px;font-weight:600;}
+.inline-form input{width:100%;padding:10px 12px;border:1px solid #d0d7e2;border-radius:10px;font-size:14px;}
+.hint{color:#64748b;font-size:14px;margin-bottom:12px;}
+.notice{margin-top:16px;padding:12px 14px;border-radius:12px;border:1px solid #f8d7a7;background:#fff7e8;color:#8a5a00;line-height:1.5;}
+.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.quick-card{background:#f8fbff;border:1px solid #dbe7f3;border-radius:14px;padding:14px;}
+@media (max-width:820px){.quick-grid{grid-template-columns:1fr;}.hero,.inline-form-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
-
 <div class="wrap">
     <div class="hero">
         <div>
             <a class="back" href="{% url 'my_team' %}">Назад</a>
             <h1>{{ team.name }}</h1>
             <div class="muted">
-                Капітан: {{ team.captain_name }}<br>
-                Email: {{ team.captain_email }}<br>
+                Контактна особа: {{ team.captain_name }}<br>
+                Електронна пошта: {{ team.captain_email }}<br>
                 Школа: {{ team.school|default:"-" }}<br>
-                Telegram: {{ team.telegram|default:"-" }}
+                Телеграм: {{ team.telegram|default:"-" }}<br>
+                Діскорд: {{ team.discord|default:"-" }}<br>
+                Вайбер: {{ team.viber|default:"-" }}
             </div>
 
             <div class="actions">
@@ -222,22 +77,10 @@ body {
         </div>
 
         <div class="stats">
-            <div class="stat">
-                <div class="stat-label">Учасників</div>
-                <div class="stat-value">{{ participants_count }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Турнірів</div>
-                <div class="stat-value">{{ team.registrations.count }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Робіт</div>
-                <div class="stat-value">{{ submissions|length }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Статус</div>
-                <div class="stat-value" style="font-size:18px;">{% if can_manage_team %}Керування{% else %}Учасник{% endif %}</div>
-            </div>
+            <div class="stat"><div class="stat-label">Учасників</div><div class="stat-value">{{ participants_count }}</div></div>
+            <div class="stat"><div class="stat-label">Турнірів</div><div class="stat-value">{{ team.registrations.count }}</div></div>
+            <div class="stat"><div class="stat-label">Робіт</div><div class="stat-value">{{ submissions|length }}</div></div>
+            <div class="stat"><div class="stat-label">Статус</div><div class="stat-value" style="font-size:18px;">{% if can_manage_team %}Керування{% else %}Учасник{% endif %}</div></div>
         </div>
     </div>
 
@@ -263,7 +106,7 @@ body {
                         <div class="muted">Усього задач: {{ quick_overview.tasks_total }}</div>
                         {% if quick_overview.tournament.is_running %}
                             <div class="actions" style="margin-top:12px;">
-                                <a class="btn btn-green" href="{% url 'submit_solution' quick_overview.next_task.id %}">Подати сабміт</a>
+                                <a class="btn btn-green" href="{% url 'submit_solution' quick_overview.next_task.id %}">Подати роботу</a>
                             </div>
                         {% endif %}
                     {% else %}
@@ -271,18 +114,15 @@ body {
                     {% endif %}
                 </div>
                 <div class="quick-card">
-                    <div class="stat-label">Ваш сабміт</div>
+                    <div class="stat-label">Остання робота</div>
                     {% if quick_overview.latest_submission %}
                         <div class="name" style="margin-top:8px;">{{ quick_overview.latest_submission.task.title }}</div>
-                        <div class="muted">
-                            Подано: {{ quick_overview.latest_submission.submitted_at }}<br>
-                            Усього сабмітів: {{ quick_overview.submitted_total }}
-                        </div>
+                        <div class="muted">Подано: {{ quick_overview.latest_submission.submitted_at }}<br>Усього робіт: {{ quick_overview.submitted_total }}</div>
                         <div class="actions" style="margin-top:12px;">
                             <a class="btn" href="{% url 'team_results' team.id %}">Оцінки та результати</a>
                         </div>
                     {% else %}
-                        <div class="muted" style="margin-top:8px;">Сабмітів для цього турніру ще немає.</div>
+                        <div class="muted" style="margin-top:8px;">Для цього турніру робіт ще немає.</div>
                     {% endif %}
                 </div>
             </div>
@@ -296,22 +136,25 @@ body {
         {% if can_manage_roster %}
             <form class="inline-form" method="post" action="{% url 'add_participant' team.id %}">
                 {% csrf_token %}
-                <div class="hint">Адміністратор або капітан може додавати учасників прямо тут, без переходу на окрему сторінку.</div>
+                <div class="hint">Адміністратор або контактна особа може додавати учасників прямо тут, без переходу на окрему сторінку.</div>
                 <div class="inline-form-grid">
                     <div>
                         <label for="{{ participant_form.full_name.id_for_label }}">Ім'я</label>
                         {{ participant_form.full_name }}
                     </div>
                     <div>
-                        <label for="{{ participant_form.email.id_for_label }}">Email</label>
+                        <label for="{{ participant_form.email.id_for_label }}">Електронна пошта</label>
                         {{ participant_form.email }}
                     </div>
-                    <div>
-                        <button class="btn btn-green" type="submit">Додати</button>
-                    </div>
+                    <div><button class="btn btn-green" type="submit">Додати</button></div>
                 </div>
             </form>
         {% endif %}
+
+        <div class="item">
+            <div class="name">{{ team.captain_name }} *</div>
+            <div class="muted">{{ team.captain_email }}</div>
+        </div>
 
         {% for participant in team.participants.all %}
             <div class="item">
@@ -328,10 +171,7 @@ body {
         {% for reg in team.registrations.all %}
             <div class="item">
                 <div class="name">{{ reg.tournament.name }}</div>
-                <div class="muted">
-                    Статус заявки: {{ reg.get_status_display }}<br>
-                    Подано: {{ reg.created_at }}
-                </div>
+                <div class="muted">Статус заявки: {{ reg.get_status_display }}<br>Подано: {{ reg.created_at }}</div>
             </div>
         {% empty %}
             <div class="muted">Команда ще не зареєстрована на турніри.</div>
@@ -346,14 +186,8 @@ body {
                 <div class="muted links">
                     Турнір: {{ submission.task.tournament.name }}<br>
                     GitHub: <a href="{{ submission.github_link }}" target="_blank">{{ submission.github_link }}</a><br>
-                    Video: <a href="{{ submission.video_link }}" target="_blank">{{ submission.video_link }}</a><br>
-                    Live demo:
-                    {% if submission.live_demo %}
-                        <a href="{{ submission.live_demo }}" target="_blank">{{ submission.live_demo }}</a>
-                    {% else %}
-                        -
-                    {% endif %}
-                    <br>
+                    Відео: <a href="{{ submission.video_link }}" target="_blank">{{ submission.video_link }}</a><br>
+                    {% if submission.live_demo %}Демо: <a href="{{ submission.live_demo }}" target="_blank">{{ submission.live_demo }}</a><br>{% endif %}
                     Подано: {{ submission.submitted_at }}<br>
                     Фінальна версія: {{ submission.is_final|yesno:"так,ні" }}
                 </div>
@@ -363,6 +197,5 @@ body {
         {% endfor %}
     </div>
 </div>
-
 </body>
 </html>

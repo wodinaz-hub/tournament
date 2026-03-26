@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 db.sqlite3
 .env
+*.env
 .cursor/
 .idea/
 *.log
+staticfiles/
+media/

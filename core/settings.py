@@ -5,6 +5,7 @@ Django settings for core project.
 import os
 from pathlib import Path
 
+import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -29,12 +30,15 @@ def env_list(name, default=""):
 DEBUG = env("DEBUG", "true").lower() == "true"
 SECRET_KEY = env("SECRET_KEY", "dev-insecure-secret-key" if DEBUG else None, required=not DEBUG)
 
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME")
 default_allowed_hosts = [
     "127.0.0.1",
     "localhost",
     "testserver",
     "serverdenis.pp.ua",
 ]
+if RENDER_EXTERNAL_HOSTNAME:
+    default_allowed_hosts.append(RENDER_EXTERNAL_HOSTNAME)
 ALLOWED_HOSTS = list(dict.fromkeys(default_allowed_hosts + env_list("ALLOWED_HOSTS")))
 
 
@@ -52,6 +56,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -83,13 +88,19 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 
+# Database configuration: prefer DATABASE_URL (Render), then individual vars, then SQLite
+database_url = env("DATABASE_URL")
 db_name = env("DB_NAME")
 db_user = env("DB_USER")
 db_password = env("DB_PASSWORD")
 db_host = env("DB_HOST")
 db_port = env("DB_PORT")
 
-if all([db_name, db_user, db_password, db_host, db_port]):
+if database_url:
+    DATABASES = {
+        "default": dj_database_url.parse(database_url)
+    }
+elif all([db_name, db_user, db_password, db_host, db_port]):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -139,10 +150,16 @@ USE_TZ = True
 
 
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+if (BASE_DIR / "static").exists():
+    STATICFILES_DIRS = [
+        BASE_DIR / "static",
+    ]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -153,6 +170,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 default_csrf_trusted_origins = [
     "https://*.trycloudflare.com",
     "https://serverdenis.pp.ua",
+    "https://*.onrender.com",
 ]
 CSRF_TRUSTED_ORIGINS = list(
     dict.fromkeys(default_csrf_trusted_origins + env_list("CSRF_TRUSTED_ORIGINS"))

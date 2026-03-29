@@ -5,6 +5,9 @@ import logging
 from datetime import timedelta
 from statistics import mean
 
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from PIL import Image, ImageDraw, ImageFont
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
@@ -59,6 +62,44 @@ from .models import CustomUser
 logger = logging.getLogger(__name__)
 
 
+def send_platform_email(to_email, subject, message):
+    provider = getattr(settings, 'EMAIL_DELIVERY_PROVIDER', '')
+
+    if provider == 'brevo':
+        payload = json.dumps(
+            {
+                'sender': {
+                    'email': settings.DEFAULT_FROM_EMAIL,
+                    'name': getattr(settings, 'EMAIL_SENDER_NAME', 'Tournament Platform'),
+                },
+                'to': [{'email': to_email}],
+                'subject': subject,
+                'textContent': message,
+            }
+        ).encode('utf-8')
+        request = Request(
+            'https://api.brevo.com/v3/smtp/email',
+            data=payload,
+            headers={
+                'accept': 'application/json',
+                'api-key': settings.BREVO_API_KEY,
+                'content-type': 'application/json',
+            },
+            method='POST',
+        )
+        with urlopen(request, timeout=settings.EMAIL_TIMEOUT):
+            pass
+        return
+
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[to_email],
+        fail_silently=False,
+    )
+
+
 def is_super_admin(user):
     return user.is_superuser
 
@@ -109,13 +150,7 @@ def send_verification_email(request, user):
             'verification_link': verification_link,
         },
     )
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
-    )
+    send_platform_email(user.email, subject, message)
 
 
 def email_delivery_ready():
@@ -125,6 +160,9 @@ def email_delivery_ready():
         'django.core.mail.backends.locmem.EmailBackend',
         'django.core.mail.backends.filebased.EmailBackend',
     }
+    provider = getattr(settings, 'EMAIL_DELIVERY_PROVIDER', '')
+    if provider == 'brevo':
+        return bool(getattr(settings, 'BREVO_API_KEY', '') and settings.DEFAULT_FROM_EMAIL)
     return settings.DEBUG or settings.EMAIL_BACKEND not in non_delivery_backends
 
 
@@ -887,12 +925,24 @@ def register_view(request):
                         email__iexact=user.email,
                     ).update(user=user)
                     send_verification_email(request, user)
-            except Exception:
+            except Exception as exc:
                 logger.exception("Failed to send verification email during registration")
-                form.add_error(
-                    None,
-                    "Не вдалося надіслати лист підтвердження. Перевірте налаштування пошти або спробуйте пізніше.",
-                )
+                if isinstance(exc, OSError) and getattr(exc, 'errno', None) == 101:
+                    form.add_error(
+                        None,
+                        "Безкоштовний Render блокує SMTP-порти. "
+                        "Для нього краще використати email API, наприклад Brevo.",
+                    )
+                elif isinstance(exc, (HTTPError, URLError)):
+                    form.add_error(
+                        None,
+                        "Не вдалося відправити лист через email API. Перевірте ключ та підтверджену адресу відправника.",
+                    )
+                else:
+                    form.add_error(
+                        None,
+                        "Не вдалося надіслати лист підтвердження. Перевірте налаштування пошти або спробуйте пізніше.",
+                    )
             else:
                 success_url = reverse('register_success')
                 if next_url:

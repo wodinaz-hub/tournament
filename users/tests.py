@@ -233,6 +233,33 @@ class TournamentPlatformViewTests(TestCase):
         self.assertContains(response, "На сервері не налаштовано реальну відправку email")
         self.assertFalse(User.objects.filter(username="prodmail").exists())
 
+    @override_settings(
+        DEBUG=False,
+        EMAIL_DELIVERY_PROVIDER="brevo",
+        BREVO_API_KEY="test-key",
+        DEFAULT_FROM_EMAIL="verified@example.com",
+        EMAIL_SENDER_NAME="Tournament Platform",
+    )
+    @patch("users.views.urlopen")
+    def test_register_uses_brevo_api_when_configured(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value = None
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "brevouser",
+                "email": "brevouser@example.com",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("register_success")))
+        self.assertTrue(User.objects.filter(username="brevouser").exists())
+        mock_urlopen.assert_called_once()
+
     def test_register_form_rejects_duplicate_email(self):
         self.client.logout()
 

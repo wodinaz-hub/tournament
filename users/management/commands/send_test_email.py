@@ -1,6 +1,6 @@
-from django.conf import settings
-from django.core.mail import send_mail
 from django.core.management.base import BaseCommand, CommandError
+
+from users.views import send_platform_email
 
 
 class Command(BaseCommand):
@@ -12,14 +12,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         recipient = options["recipient"]
 
-        if not settings.DEFAULT_FROM_EMAIL:
-            raise CommandError("DEFAULT_FROM_EMAIL не налаштований.")
+        try:
+            send_platform_email(
+                recipient,
+                "Тестовий лист із платформи турнірів",
+                "Якщо ви отримали цей лист, email-конфігурація працює.",
+            )
+        except Exception as exc:
+            raise CommandError(str(exc)) from exc
 
-        send_mail(
-            subject="Тестовий лист із платформи турнірів",
-            message="Якщо ви отримали цей лист, email-конфігурація працює.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[recipient],
-            fail_silently=False,
-        )
         self.stdout.write(self.style.SUCCESS(f"Лист успішно відправлено на {recipient}"))

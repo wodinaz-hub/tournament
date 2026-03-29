@@ -196,6 +196,16 @@ EMAIL_USE_TLS = env("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_USE_SSL = env("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "20"))
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@serverdenis.pp.ua")
+EMAIL_SENDER_NAME = env("EMAIL_SENDER_NAME", "Tournament Platform")
+BREVO_API_KEY = env("BREVO_API_KEY", "")
+EMAIL_DELIVERY_PROVIDER = env("EMAIL_DELIVERY_PROVIDER", "").lower()
+if not EMAIL_DELIVERY_PROVIDER:
+    if BREVO_API_KEY:
+        EMAIL_DELIVERY_PROVIDER = "brevo"
+    elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+        EMAIL_DELIVERY_PROVIDER = "smtp"
+    else:
+        EMAIL_DELIVERY_PROVIDER = "console"
 
 
 default_csrf_trusted_origins = [

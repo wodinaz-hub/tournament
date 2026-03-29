@@ -17,7 +17,21 @@ class UniqueEmailMixin:
         return email
 
 
-class RegisterForm(UniqueEmailMixin, UserCreationForm):
+class UniqueUsernameMixin:
+    def clean_username(self):
+        username = (self.cleaned_data.get('username') or '').strip()
+        if not username:
+            return username
+
+        queryset = CustomUser.objects.filter(username__iexact=username)
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise forms.ValidationError('Користувач з таким логіном уже існує.')
+        return username
+
+
+class RegisterForm(UniqueEmailMixin, UniqueUsernameMixin, UserCreationForm):
     username = forms.CharField(
         label='Логін',
         widget=forms.TextInput(attrs={'class': 'form-input'})
@@ -56,7 +70,7 @@ class LoginForm(AuthenticationForm):
     )
 
 
-class AdminCreateUserForm(UniqueEmailMixin, UserCreationForm):
+class AdminCreateUserForm(UniqueEmailMixin, UniqueUsernameMixin, UserCreationForm):
     username = forms.CharField(
         label='Логін',
         widget=forms.TextInput(attrs={'class': 'form-input'})

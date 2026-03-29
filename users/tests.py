@@ -276,6 +276,42 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Користувач з таким email уже існує.")
 
+    @patch("users.views.send_verification_email")
+    def test_register_does_not_send_email_for_duplicate_username(self, mock_send):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": self.participant_user.username,
+                "email": "newaddress@example.com",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Користувач з таким логіном уже існує.")
+        mock_send.assert_not_called()
+
+    @patch("users.views.send_verification_email")
+    def test_register_does_not_send_email_for_duplicate_email(self, mock_send):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "totallynewuser",
+                "email": self.participant_user.email,
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Користувач з таким email уже існує.")
+        mock_send.assert_not_called()
+
     def test_home_page_is_public_and_shows_tournaments(self):
         self.client.logout()
         tournament = self.create_tournament(name="Public Cup")

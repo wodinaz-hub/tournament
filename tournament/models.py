@@ -49,6 +49,20 @@ class Tournament(models.Model):
         related_name="jury_tournaments",
         verbose_name="Призначене журі",
     )
+    evaluation_finished_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Оцінювання завершено",
+    )
+    evaluation_finished_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tournaments_evaluation_finished",
+        verbose_name="Оцінювання завершив",
+    )
 
 
     class Meta:
@@ -112,6 +126,41 @@ class Tournament(models.Model):
     @property
     def is_finished(self):
         return self.end_date is not None and timezone.now() > self.end_date
+
+    @property
+    def all_submissions_evaluated(self):
+        submission_ids = list(
+            Submission.objects.filter(
+                task__tournament=self,
+            ).values_list('id', flat=True).distinct()
+        )
+        if not submission_ids:
+            return False
+
+        evaluated_submission_ids = set(
+            Evaluation.objects.filter(
+                assignment__submission_id__in=submission_ids,
+            ).values_list('assignment__submission_id', flat=True).distinct()
+        )
+        return len(evaluated_submission_ids) == len(set(submission_ids))
+
+    @property
+    def evaluation_results_ready(self):
+        return (
+            self.is_finished
+            and (
+                self.evaluation_finished_at is not None
+                or self.all_submissions_evaluated
+            )
+        )
+
+    @property
+    def evaluation_status_label(self):
+        if self.evaluation_results_ready:
+            return "Оцінювання завершено"
+        if self.is_finished:
+            return "Оцінювання триває"
+        return "Оцінювання ще не завершено"
 
 
 class Team(models.Model):

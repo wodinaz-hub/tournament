@@ -378,6 +378,22 @@ def build_tournament_leaderboard(tournament):
     return leaderboard
 
 
+def finalize_tournament_evaluation_if_ready(tournament, *, finished_by=None):
+    if (
+        tournament.is_finished
+        and tournament.all_submissions_evaluated
+        and tournament.evaluation_finished_at is None
+    ):
+        tournament.evaluation_finished_at = timezone.now()
+        if finished_by is not None:
+            tournament.evaluation_finished_by = finished_by
+            tournament.save(update_fields=['evaluation_finished_at', 'evaluation_finished_by'])
+        else:
+            tournament.save(update_fields=['evaluation_finished_at'])
+        return True
+    return False
+
+
 def is_tournament_edit_locked(tournament):
     return (
         not tournament.is_draft
@@ -533,7 +549,7 @@ def build_public_tournament_rows():
                 tournament=tournament,
                 status=TournamentRegistration.Status.PENDING,
             ).count(),
-            'leaderboard_preview': build_tournament_leaderboard(tournament)[:3] if tournament.is_finished else [],
+            'leaderboard_preview': build_tournament_leaderboard(tournament)[:3] if tournament.evaluation_results_ready else [],
         })
     return rows
 
@@ -640,13 +656,22 @@ def build_user_message_items(user):
                             kind='deadline',
                             tournament=tournament,
                         )
-                    if tournament.is_finished:
+                if tournament.is_finished:
+                    add_item(
+                        key=f"finished:{tournament.id}",
+                        title=f"Сабміти закрито: {tournament.name}",
+                        body="Турнір завершено. Прийом робіт закрито, офіційні відповіді вже доступні, а підсумковий рейтинг відкриється після завершення оцінювання.",
+                        created_at=tournament.end_date,
+                        kind='finished',
+                        tournament=tournament,
+                    )
+                    if tournament.evaluation_results_ready:
                         add_item(
-                            key=f"finished:{tournament.id}",
-                            title=f"Сабміти закрито: {tournament.name}",
-                            body="Турнір завершено. Тепер можна переглядати підсумкові результати та офіційні відповіді.",
-                            created_at=tournament.end_date,
-                            kind='finished',
+                            key=f"evaluation-finished:{tournament.id}",
+                            title=f"Оцінювання завершено: {tournament.name}",
+                            body="Підсумковий лідерборд і результати команд уже доступні.",
+                            created_at=tournament.evaluation_finished_at or tournament.end_date,
+                            kind='system',
                             tournament=tournament,
                         )
 
@@ -776,8 +801,10 @@ def home(request):
             text = 'Відкрита реєстрація. Можна подавати заявки.'
         elif tournament.is_running:
             text = 'Турнір уже триває.'
+        elif tournament.is_finished and tournament.evaluation_results_ready:
+            text = 'Турнір завершено, оцінювання закрито. Підсумковий лідерборд уже доступний.'
         elif tournament.is_finished:
-            text = 'Турнір завершено. Доступний підсумковий лідерборд.'
+            text = 'Турнір завершено. Оцінювання ще триває, підсумковий лідерборд з’явиться пізніше.'
         else:
             text = 'Турнір заплановано. Слідкуйте за датами старту.'
         news_rows.append({'tournament': tournament, 'text': text})
@@ -866,7 +893,7 @@ def build_archive_rows_for_user(user):
 
     rows = []
     for tournament in finished_tournaments:
-        leaderboard = build_tournament_leaderboard(tournament)
+        leaderboard = build_tournament_leaderboard(tournament) if tournament.evaluation_results_ready else []
         my_registration = None
         if getattr(user, 'is_authenticated', False):
             approved_registrations = TournamentRegistration.objects.filter(
@@ -1025,7 +1052,7 @@ def public_tournament_detail(request, tournament_id):
         id=tournament_id,
         is_draft=False,
     )
-    leaderboard = build_tournament_leaderboard(tournament) if tournament.is_finished else []
+    leaderboard = build_tournament_leaderboard(tournament) if tournament.evaluation_results_ready else []
     existing_registration = None
     registration_form = None
     can_submit_registration = False
@@ -1088,7 +1115,7 @@ def public_tournament_detail(request, tournament_id):
         'tasks': tournament.tasks.filter(is_draft=False),
         'leaderboard_preview': leaderboard[:5],
         'leaderboard_total': len(leaderboard),
-        'show_public_leaderboard': tournament.is_finished,
+        'show_public_leaderboard': tournament.evaluation_results_ready,
         'registration_form': registration_form,
         'existing_registration': existing_registration,
         'viewer_can_register': viewer_can_register,
@@ -1437,6 +1464,7 @@ def start_tournament_now(request, tournament_id):
         'start_date',
         'end_date',
     ])
+    finalize_tournament_evaluation_if_ready(tournament, finished_by=request.user)
     return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
 
 
@@ -1463,6 +1491,28 @@ def finish_tournament_now(request, tournament_id):
         'registration_end',
         'start_date',
         'end_date',
+    ])
+    return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
+
+
+@login_required
+def finish_evaluation_now(request, tournament_id):
+    if not can_manage_tournaments(request.user):
+        return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return redirect(get_dashboard_url_for_user(request.user))
+
+    tournament = get_object_or_404(Tournament, id=tournament_id)
+    if not can_manage_tournament_instance(request.user, tournament):
+        return redirect('redirect_by_role')
+    if not tournament.is_finished:
+        return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
+
+    tournament.evaluation_finished_at = timezone.now()
+    tournament.evaluation_finished_by = request.user
+    tournament.save(update_fields=[
+        'evaluation_finished_at',
+        'evaluation_finished_by',
     ])
     return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
 
@@ -1544,7 +1594,7 @@ def download_certificate_pdf(request, certificate_id):
 @login_required
 def export_tournament_results_csv(request, tournament_id):
     tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
-    if not can_export_tournament_results(request.user, tournament):
+    if not can_export_tournament_results(request.user, tournament) or not tournament.evaluation_results_ready:
         return redirect('redirect_by_role')
 
     leaderboard = build_tournament_leaderboard(tournament)
@@ -1759,6 +1809,10 @@ def submit_evaluation(request, submission_id):
         saved_evaluation = form.save(commit=False)
         saved_evaluation.assignment = assignment
         saved_evaluation.save()
+        finalize_tournament_evaluation_if_ready(
+            submission.task.tournament,
+            finished_by=request.user,
+        )
 
     return redirect('jury_tournament_detail', tournament_id=submission.task.tournament_id)
 
@@ -1830,7 +1884,7 @@ def profile_view(request):
             'can_view_leaderboard': (
                 active_registration is not None
                 and active_registration.status == TournamentRegistration.Status.APPROVED
-                and tournament.is_finished
+                and tournament.evaluation_results_ready
             ),
         })
 
@@ -2130,7 +2184,7 @@ def tournament_tasks(request, tournament_id):
         return redirect('participant_dashboard')
 
     tasks = Task.objects.filter(tournament=tournament, is_draft=False)
-    leaderboard = build_tournament_leaderboard(tournament) if tournament.is_finished else []
+    leaderboard = build_tournament_leaderboard(tournament) if tournament.evaluation_results_ready else []
     my_team = my_registration.team if my_registration is not None else None
     preview_rows = leaderboard[:5]
     return render(request, 'tournament_tasks.html', {
@@ -2140,14 +2194,14 @@ def tournament_tasks(request, tournament_id):
         'leaderboard_total': len(leaderboard),
         'my_team': my_team,
         'show_official_solutions': tournament.is_finished,
-        'show_leaderboard': tournament.is_finished,
+        'show_leaderboard': tournament.evaluation_results_ready,
     })
 
 
 @login_required
 def tournament_leaderboard(request, tournament_id):
     tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
-    if not tournament.is_finished and not request.user.is_superuser:
+    if not tournament.evaluation_results_ready and not request.user.is_superuser:
         return redirect('tournament_tasks', tournament_id=tournament.id)
     approved_registrations = TournamentRegistration.objects.filter(
         tournament=tournament,
@@ -2173,7 +2227,7 @@ def tournament_leaderboard(request, tournament_id):
         'tournament': tournament,
         'leaderboard': leaderboard,
         'my_team': my_team,
-        'can_export_results': can_export_tournament_results(request.user, tournament),
+        'can_export_results': can_export_tournament_results(request.user, tournament) and tournament.evaluation_results_ready,
     })
 
 

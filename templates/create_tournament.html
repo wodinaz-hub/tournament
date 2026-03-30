@@ -295,6 +295,13 @@
                     {% endif %}
 
                     <div class="actions-bar">
+                        {% if mode == 'edit' and tournament and tournament.is_finished and not tournament.evaluation_results_ready %}
+                            <form method="post" action="{% url 'finish_evaluation_now' tournament.id %}" style="margin:0;">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.path }}">
+                                <button type="submit" class="btn-ghost">Завершити оцінювання</button>
+                            </form>
+                        {% endif %}
                         <button type="submit" class="btn">{% if mode == 'edit' %}Зберегти{% else %}Створити{% endif %}</button>
                         <a class="back-link" href="{{ dashboard_url|default:'/dashboard/tournaments/active/' }}">Назад</a>
                     </div>

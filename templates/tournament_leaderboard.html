@@ -39,9 +39,8 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
             </div>
             <h1 style="margin:14px 0 10px;">Лідерборд {{ tournament.name }}</h1>
             <div class="muted">
-                Рейтинг оновлюється автоматично кожні 10 секунд після нових оцінок журі.
-                При однаковому середньому вище стоїть команда з кращим окремим результатом,
-                а потім з більшою кількістю оцінених задач.
+                Підсумковий рейтинг відкрито після завершення оцінювання.
+                Якщо всі оцінки вже здані, сторінка оновлюється автоматично кожні 10 секунд.
             </div>
         </div>
         <div class="toolbar">
@@ -59,7 +58,7 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
                 <div>Команда</div>
                 <div>Середній бал</div>
                 <div>Кращий бал</div>
-                <div>Оцінених задач</div>
+                <div>Оцінених завдань</div>
                 <div>Поданих робіт</div>
             </div>
 
@@ -69,7 +68,7 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
                         <div><span class="place">#{{ row.place }}</span></div>
                         <div>
                             <strong>{{ row.team.name }}</strong>
-                        <div class="cell-muted">Контактна особа: {{ row.team.captain_name }}</div>
+                            <div class="cell-muted">Контактна особа: {{ row.team.captain_name }}</div>
                         </div>
                         <div>{% if row.overall_average is not None %}{{ row.overall_average|floatformat:1 }}{% else %}-{% endif %}</div>
                         <div>{% if row.best_score is not None %}{{ row.best_score|floatformat:1 }}{% else %}-{% endif %}</div>
@@ -116,7 +115,7 @@ function renderRows(rows) {
             <div><span class="place">#${escapeHtml(row.place)}</span></div>
             <div>
                 <strong>${escapeHtml(row.team_name)}</strong>
-<div class="cell-muted">Контактна особа: ${escapeHtml(row.captain_name)}</div>
+                <div class="cell-muted">Контактна особа: ${escapeHtml(row.captain_name)}</div>
             </div>
             <div>${escapeHtml(formatScore(row.overall_average))}</div>
             <div>${escapeHtml(formatScore(row.best_score))}</div>
@@ -149,8 +148,3 @@ setInterval(refreshLeaderboard, 10000);
 </script>
 </body>
 </html>
-
-
-
-
-

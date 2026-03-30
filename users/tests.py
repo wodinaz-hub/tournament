@@ -945,6 +945,7 @@ class TournamentPlatformViewTests(TestCase):
             end_date=timezone.now() - timedelta(hours=1),
             registration_end=timezone.now() - timedelta(hours=2),
         )
+        tournament.jury_users.add(self.jury_user)
         task = Task.objects.create(
             tournament=tournament,
             title="Live task",
@@ -992,6 +993,103 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(payload["rows"][0]["team_name"], "Live Team")
         self.assertEqual(payload["rows"][0]["place"], 1)
 
+    def test_finished_tournament_hides_leaderboard_until_evaluation_finishes(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(days=1),
+            end_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        tournament.jury_users.add(self.jury_user)
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Pending evaluation task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        team = Team.objects.create(
+            name="Waiting Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        Submission.objects.create(
+            team=team,
+            task=task,
+            github_link="https://github.com/example/waiting",
+            video_link="https://example.com/video",
+            is_final=True,
+        )
+
+        response = self.client.get(reverse("tournament_leaderboard", args=[tournament.id]))
+
+        self.assertRedirects(response, reverse("tournament_tasks", args=[tournament.id]))
+
+    def test_finished_tournament_publishes_results_after_first_evaluation(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(days=1),
+            end_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        tournament.jury_users.add(self.jury_user)
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Evaluation task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        team = Team.objects.create(
+            name="Evaluated Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        submission = Submission.objects.create(
+            team=team,
+            task=task,
+            github_link="https://github.com/example/evaluated",
+            video_link="https://example.com/video",
+            is_final=True,
+        )
+
+        self.client.force_login(self.jury_user)
+        response = self.client.post(
+            reverse("submit_evaluation", args=[submission.id]),
+            {
+                f"eval-{submission.id}-score_backend": 88,
+                f"eval-{submission.id}-score_frontend": 86,
+                f"eval-{submission.id}-score_functionality": 92,
+                f"eval-{submission.id}-score_ux": 90,
+                f"eval-{submission.id}-comment": "Ready",
+            },
+        )
+
+        self.assertRedirects(response, reverse("jury_tournament_detail", args=[tournament.id]))
+        tournament.refresh_from_db()
+        self.assertIsNotNone(tournament.evaluation_finished_at)
+
+        self.client.force_login(self.captain)
+        leaderboard_response = self.client.get(reverse("tournament_leaderboard", args=[tournament.id]))
+        self.assertEqual(leaderboard_response.status_code, 200)
+        self.assertContains(leaderboard_response, "Evaluated Team")
+
     def test_organizer_can_start_and_finish_tournament_now(self):
         tournament = self.create_tournament(
             created_by=self.organizer_user,
@@ -1010,6 +1108,22 @@ class TournamentPlatformViewTests(TestCase):
         self.assertFalse(tournament.is_draft)
         self.assertLessEqual(tournament.registration_end, timezone.now())
         self.assertLessEqual(tournament.end_date, timezone.now())
+
+    def test_organizer_can_finish_evaluation_manually(self):
+        tournament = self.create_tournament(
+            created_by=self.organizer_user,
+            start_date=timezone.now() - timedelta(days=1),
+            end_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        self.client.force_login(self.organizer_user)
+
+        response = self.client.post(reverse("finish_evaluation_now", args=[tournament.id]))
+
+        self.assertRedirects(response, reverse("organizer_dashboard"))
+        tournament.refresh_from_db()
+        self.assertIsNotNone(tournament.evaluation_finished_at)
+        self.assertEqual(tournament.evaluation_finished_by, self.organizer_user)
 
     def test_admin_can_open_separate_create_user_page(self):
         self.client.force_login(self.admin_user)
@@ -2386,6 +2500,7 @@ class TournamentPlatformViewTests(TestCase):
             end_date=timezone.now() - timedelta(hours=1),
             registration_end=timezone.now() - timedelta(hours=2),
         )
+        tournament.jury_users.add(self.jury_user)
         task = Task.objects.create(
             tournament=tournament,
             title="Leaderboard task",

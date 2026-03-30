@@ -393,7 +393,7 @@
                 <p>
                     На головній видно активні, майбутні та завершені турніри, новини платформи,
                     повідомлення від системи та підсумкові лідерборди. Лідерборд відкривається
-                    тільки після завершення турніру, а в профілі та повідомленнях користувач бачить
+                    тільки після завершення оцінювання, а в профілі та повідомленнях користувач бачить
                     свій статус, дедлайни та сертифікати.
                 </p>
             </div>
@@ -456,7 +456,7 @@
                         <div class="tournament-description">{{ row.tournament.description|truncatechars:180 }}</div>
                         <div class="mini-board">
                             <strong>Лідерборд</strong>
-                            {% if row.tournament.is_finished %}
+                            {% if row.tournament.evaluation_results_ready %}
                                 {% for item in row.leaderboard_preview %}
                                     <div class="leader-row">
                                         <span>#{{ item.place }} {{ item.team.name }}</span>
@@ -469,10 +469,10 @@
                                         </strong>
                                     </div>
                                 {% empty %}
-                                    <div class="empty">Після завершення тут з'являться підсумкові місця.</div>
+                                    <div class="empty">Після завершення оцінювання тут з'являться підсумкові місця.</div>
                                 {% endfor %}
                             {% else %}
-                                <div class="empty">Підсумковий лідерборд стане доступним після завершення турніру.</div>
+                                <div class="empty">Підсумковий лідерборд стане доступним після завершення оцінювання.</div>
                             {% endif %}
                         </div>
                     </a>

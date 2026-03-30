@@ -120,6 +120,7 @@
                             <div class="meta">
                                 Реєстрація: {{ tournament.registration_start|default:"-" }} - {{ tournament.registration_end|default:"-" }}<br>
                                 Турнір: {{ tournament.start_date|default:"-" }} - {{ tournament.end_date|default:"-" }}<br>
+                                Статус оцінювання: {{ tournament.evaluation_status_label }}<br>
                                 Журі:
                                 {% for jury in tournament.jury_users.all %}
                                     {{ jury.username }}{% if not forloop.last %}, {% endif %}
@@ -130,7 +131,9 @@
                             <div class="actions-inline">
                                 <a class="button-secondary" href="{% url 'edit_tournament' tournament.id %}">Редагувати</a>
                                 <a class="button" href="{% url 'create_tournament_task' tournament.id %}">Додати завдання</a>
-                                <a class="button-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт результатів CSV</a>
+                                {% if tournament.evaluation_results_ready %}
+                                    <a class="button-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт результатів CSV</a>
+                                {% endif %}
                                 {% if tournament.lifecycle_status != 'running' and tournament.lifecycle_status != 'finished' %}
                                     <form method="post" action="{% url 'start_tournament_now' tournament.id %}">
                                         {% csrf_token %}
@@ -141,6 +144,12 @@
                                     <form method="post" action="{% url 'finish_tournament_now' tournament.id %}">
                                         {% csrf_token %}
                                         <button class="button-danger" type="submit">Завершити зараз</button>
+                                    </form>
+                                {% endif %}
+                                {% if tournament.is_finished and not tournament.evaluation_results_ready %}
+                                    <form method="post" action="{% url 'finish_evaluation_now' tournament.id %}">
+                                        {% csrf_token %}
+                                        <button class="button-secondary" type="submit">Завершити оцінювання</button>
                                     </form>
                                 {% endif %}
                             </div>

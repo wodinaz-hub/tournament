@@ -7,89 +7,119 @@
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6fb;
             min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 28%),
+                linear-gradient(180deg, #eef4ff 0%, #f7faff 42%, #ffffff 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
+            color: #172033;
         }
         .card {
             width: 100%;
-            max-width: 420px;
-            background: white;
-            padding: 32px;
-            border-radius: 16px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+            max-width: 460px;
+            background: #ffffff;
+            border: 1px solid #d8e2f0;
+            border-radius: 22px;
+            padding: 34px;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
         }
         h1 {
-            margin: 0 0 8px;
-            font-size: 28px;
+            margin: 0 0 10px;
+            font-size: 30px;
             text-align: center;
         }
         .sub {
+            margin: 0 0 24px;
             text-align: center;
-            color: #666;
-            margin-bottom: 24px;
+            color: #66758b;
+            line-height: 1.6;
+        }
+        .message {
+            margin-bottom: 16px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            line-height: 1.6;
+            background: #fff4d6;
+            color: #7a5a00;
+        }
+        .message.blocked {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .timer {
+            display: inline-block;
+            margin-top: 8px;
+            font-weight: 700;
         }
         label {
             display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
+            margin-bottom: 7px;
+            font-weight: 700;
         }
         input {
             width: 100%;
             padding: 12px 14px;
             margin-bottom: 10px;
-            border: 1px solid #d0d7e2;
-            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
             font-size: 15px;
+            background: #fff;
         }
         button {
             width: 100%;
+            margin-top: 6px;
             border: none;
+            border-radius: 12px;
+            padding: 13px 16px;
             background: #2563eb;
             color: white;
-            padding: 13px;
-            border-radius: 10px;
             font-size: 16px;
+            font-weight: 700;
             cursor: pointer;
         }
-        .msg {
-            background: #fff4d6;
-            color: #7a5a00;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 16px;
-            line-height: 1.6;
-        }
         .field-errors {
+            margin: -4px 0 10px;
             color: #b00020;
             font-size: 14px;
-            margin: -4px 0 10px;
         }
         .bottom {
-            text-align: center;
             margin-top: 18px;
+            text-align: center;
+            color: #66758b;
         }
         .bottom a {
             color: #2563eb;
             text-decoration: none;
+            font-weight: 700;
         }
     </style>
 </head>
 <body>
     <div class="card">
         <h1>Вхід</h1>
-        <div class="sub">Увійдіть у свій акаунт</div>
+        <p class="sub">Увійдіть у свій акаунт, щоб працювати з турнірами, командами та оцінюванням.</p>
 
         {% if message %}
-            <div class="msg">{{ message }}</div>
+            <div class="message{% if blocked_until %} blocked{% endif %}">
+                {{ message }}
+                {% if blocked_until %}
+                    <div
+                        class="timer"
+                        id="login-block-timer"
+                        data-blocked-until="{{ blocked_until_iso }}"
+                    >
+                        Розблокування через: --
+                    </div>
+                {% endif %}
+            </div>
         {% endif %}
 
         {% if form.non_field_errors %}
-            <div class="msg">{{ form.non_field_errors }}</div>
+            <div class="message">{{ form.non_field_errors }}</div>
         {% endif %}
 
         <form method="post">
@@ -114,8 +144,36 @@
         </form>
 
         <div class="bottom">
-            Немає акаунта? <a href="{% url 'register' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}">Зареєструватися</a>
+            Ще не маєте акаунта?
+            <a href="{% url 'register' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}">Зареєструватися</a>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const timer = document.getElementById('login-block-timer');
+            if (!timer) { return; }
+
+            const blockedUntil = new Date(timer.dataset.blockedUntil);
+            function formatRemaining(totalSeconds) {
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            }
+
+            function tick() {
+                const diffMs = blockedUntil.getTime() - Date.now();
+                if (diffMs <= 0) {
+                    timer.textContent = 'Блокування завершилося. Можна спробувати ще раз.';
+                    return;
+                }
+                const diffSeconds = Math.ceil(diffMs / 1000);
+                timer.textContent = 'Розблокування через: ' + formatRemaining(diffSeconds);
+                window.setTimeout(tick, 1000);
+            }
+
+            tick();
+        })();
+    </script>
 </body>
 </html>

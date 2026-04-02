@@ -207,6 +207,9 @@ if not EMAIL_DELIVERY_PROVIDER:
     else:
         EMAIL_DELIVERY_PROVIDER = "console"
 
+LOGIN_MAX_ATTEMPTS = int(env("LOGIN_MAX_ATTEMPTS", "5"))
+LOGIN_BLOCK_MINUTES = int(env("LOGIN_BLOCK_MINUTES", "15"))
+
 
 default_csrf_trusted_origins = [
     "https://*.trycloudflare.com",

@@ -57,9 +57,73 @@ from tournament.models import (
 from tournament.services import RegistrationService
 
 from .forms import AdminCreateUserForm, LoginForm, RegisterForm
-from .models import CustomUser
+from .models import CustomUser, LoginThrottle
 
 logger = logging.getLogger(__name__)
+
+LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY = 'login_throttle_identifier'
+LOGIN_THROTTLE_IP_SESSION_KEY = 'login_throttle_ip'
+
+
+def get_client_ip(request):
+    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '') or 'unknown'
+
+
+def normalize_login_identifier(value):
+    return (value or '').strip().lower()
+
+
+def get_login_throttle(identifier, ip_address):
+    if not identifier:
+        return None
+    return LoginThrottle.objects.filter(
+        identifier=identifier,
+        ip_address=ip_address,
+    ).first()
+
+
+def clear_login_throttle(request, identifier, ip_address):
+    if identifier:
+        LoginThrottle.objects.filter(
+            identifier=identifier,
+            ip_address=ip_address,
+        ).delete()
+    request.session.pop(LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY, None)
+    request.session.pop(LOGIN_THROTTLE_IP_SESSION_KEY, None)
+
+
+def register_failed_login(identifier, ip_address):
+    if not identifier:
+        return None, None
+
+    now = timezone.now()
+    throttle, _created = LoginThrottle.objects.get_or_create(
+        identifier=identifier,
+        ip_address=ip_address,
+    )
+
+    if throttle.blocked_until and throttle.blocked_until > now:
+        return throttle, 0
+
+    max_attempts = getattr(settings, 'LOGIN_MAX_ATTEMPTS', 5)
+    block_minutes = getattr(settings, 'LOGIN_BLOCK_MINUTES', 15)
+    next_attempts = throttle.failed_attempts + 1
+
+    throttle.failed_attempts = next_attempts
+    throttle.last_failed_at = now
+
+    if next_attempts >= max_attempts:
+        throttle.blocked_until = now + timedelta(minutes=block_minutes)
+        throttle.failed_attempts = 0
+        throttle.save(update_fields=['failed_attempts', 'blocked_until', 'last_failed_at'])
+        return throttle, 0
+
+    throttle.blocked_until = None
+    throttle.save(update_fields=['failed_attempts', 'blocked_until', 'last_failed_at'])
+    return throttle, max_attempts - next_attempts
 
 
 def build_team_detail_context(request, team, participant_form=None):
@@ -1083,14 +1147,57 @@ def verify_email_view(request, uidb64, token):
 def login_view(request):
     message = ''
     next_url = request.GET.get('next') or request.POST.get('next')
+    blocked_until = None
+    blocked_identifier = None
+    client_ip = get_client_ip(request)
 
     if request.user.is_authenticated:
         return redirect(get_safe_redirect(request, next_url, reverse('redirect_by_role')))
 
+    if request.method == 'GET':
+        session_identifier = request.session.get(LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY)
+        session_ip = request.session.get(LOGIN_THROTTLE_IP_SESSION_KEY)
+        if session_identifier and session_ip == client_ip:
+            throttle = get_login_throttle(session_identifier, client_ip)
+            if throttle and throttle.blocked_until and throttle.blocked_until > timezone.now():
+                blocked_until = throttle.blocked_until
+                blocked_identifier = session_identifier
+                message = (
+                    'Забагато невдалих спроб входу. '
+                    'Спробуйте ще раз після завершення таймера.'
+                )
+            else:
+                clear_login_throttle(request, session_identifier, client_ip)
+
     if request.method == 'POST':
+        blocked_identifier = normalize_login_identifier(request.POST.get('username'))
+        throttle = get_login_throttle(blocked_identifier, client_ip)
+        if throttle and throttle.blocked_until and throttle.blocked_until > timezone.now():
+            blocked_until = throttle.blocked_until
+            request.session[LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY] = blocked_identifier
+            request.session[LOGIN_THROTTLE_IP_SESSION_KEY] = client_ip
+            form = LoginForm(request, data=request.POST)
+            message = (
+                'Забагато невдалих спроб входу. '
+                'Спробуйте ще раз після завершення таймера.'
+            )
+            return render(
+                request,
+                'login.html',
+                {
+                    'form': form,
+                    'message': message,
+                    'next_url': next_url,
+                    'blocked_until': blocked_until,
+                    'blocked_until_iso': blocked_until.isoformat(),
+                    'blocked_login_identifier': blocked_identifier,
+                },
+            )
+
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
+            clear_login_throttle(request, blocked_identifier, client_ip)
             if not user.email_verified:
                 message = 'Спочатку підтвердіть електронну пошту через лист, який ми надіслали після реєстрації.'
             elif not user.is_approved and not user.is_superuser:
@@ -1099,13 +1206,34 @@ def login_view(request):
                 login(request, user)
                 return redirect(get_safe_redirect(request, next_url, reverse('redirect_by_role')))
         else:
-            message = 'Неправильний логін або пароль.'
+            throttle, attempts_left = register_failed_login(blocked_identifier, client_ip)
+            if throttle and throttle.blocked_until and throttle.blocked_until > timezone.now():
+                blocked_until = throttle.blocked_until
+                request.session[LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY] = blocked_identifier
+                request.session[LOGIN_THROTTLE_IP_SESSION_KEY] = client_ip
+                message = (
+                    'Забагато невдалих спроб входу. '
+                    'Спробуйте ще раз після завершення таймера.'
+                )
+            elif attempts_left is not None:
+                message = f'Неправильний логін або пароль. Залишилося спроб: {attempts_left}.'
+            else:
+                message = 'Неправильний логін або пароль.'
     else:
         form = LoginForm()
         if request.GET.get('verified') == '1':
             message = 'Пошту підтверджено. Тепер можна увійти в акаунт.'
 
-    return render(request, 'login.html', {'form': form, 'message': message, 'next_url': next_url})
+    context = {
+        'form': form,
+        'message': message,
+        'next_url': next_url,
+        'blocked_until': blocked_until,
+        'blocked_login_identifier': blocked_identifier,
+    }
+    if blocked_until:
+        context['blocked_until_iso'] = blocked_until.isoformat()
+    return render(request, 'login.html', context)
 
 
 @login_required

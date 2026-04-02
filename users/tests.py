@@ -30,6 +30,7 @@ from tournament.models import (
     TournamentScheduleItem,
     TournamentRegistration,
 )
+from users.models import LoginThrottle
 
 
 User = get_user_model()
@@ -165,6 +166,86 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Спочатку підтвердіть електронну пошту")
         self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(LOGIN_MAX_ATTEMPTS=3, LOGIN_BLOCK_MINUTES=15)
+    def test_login_is_temporarily_blocked_after_too_many_failed_attempts(self):
+        self.client.logout()
+
+        for _attempt in range(2):
+            response = self.client.post(
+                reverse("login"),
+                {"username": self.captain.username, "password": "wrong-password"},
+            )
+
+        self.assertContains(response, "Залишилося спроб: 1")
+
+        blocked_response = self.client.post(
+            reverse("login"),
+            {"username": self.captain.username, "password": "wrong-password"},
+        )
+
+        self.assertEqual(blocked_response.status_code, 200)
+        self.assertContains(blocked_response, "Забагато невдалих спроб входу")
+        self.assertContains(blocked_response, "Розблокування через:")
+        throttle = LoginThrottle.objects.get(
+            identifier=self.captain.username.lower(),
+            ip_address="127.0.0.1",
+        )
+        self.assertIsNotNone(throttle.blocked_until)
+
+        login_response = self.client.post(
+            reverse("login"),
+            {"username": self.captain.username, "password": "secret123"},
+        )
+
+        self.assertContains(login_response, "Забагато невдалих спроб входу")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(LOGIN_MAX_ATTEMPTS=3, LOGIN_BLOCK_MINUTES=15)
+    def test_login_block_expires_and_allows_successful_sign_in(self):
+        self.client.logout()
+        throttle = LoginThrottle.objects.create(
+            identifier=self.captain.username.lower(),
+            ip_address="127.0.0.1",
+            failed_attempts=0,
+            blocked_until=timezone.now() - timedelta(minutes=1),
+        )
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": self.captain.username, "password": "secret123"},
+        )
+
+        self.assertRedirects(response, reverse("redirect_by_role"), fetch_redirect_response=False)
+        self.assertFalse(
+            LoginThrottle.objects.filter(
+                identifier=self.captain.username.lower(),
+                ip_address="127.0.0.1",
+            ).exists()
+        )
+
+    @override_settings(LOGIN_MAX_ATTEMPTS=3, LOGIN_BLOCK_MINUTES=15)
+    def test_successful_login_clears_previous_failed_attempts(self):
+        self.client.logout()
+        LoginThrottle.objects.create(
+            identifier=self.captain.username.lower(),
+            ip_address="127.0.0.1",
+            failed_attempts=2,
+            blocked_until=None,
+        )
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": self.captain.username, "password": "secret123"},
+        )
+
+        self.assertRedirects(response, reverse("redirect_by_role"), fetch_redirect_response=False)
+        self.assertFalse(
+            LoginThrottle.objects.filter(
+                identifier=self.captain.username.lower(),
+                ip_address="127.0.0.1",
+            ).exists()
+        )
 
     def test_email_verification_marks_user_as_verified(self):
         user = User.objects.create_user(

@@ -357,6 +357,54 @@ class TournamentPlatformViewTests(TestCase):
         self.assertContains(response, 'data-filter-bucket="', html=False)
         self.assertContains(response, "tournament-filter-empty", html=False)
 
+    def test_home_page_shows_quick_team_block_for_team_member(self):
+        now = timezone.now()
+        tournament = self.create_tournament(
+            name="Home Quick Cup",
+            start_date=now - timedelta(hours=1),
+            end_date=now + timedelta(hours=10),
+            registration_end=now - timedelta(hours=2),
+        )
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Home quick task",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            start_at=now - timedelta(minutes=30),
+            deadline=now + timedelta(hours=2),
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+        team = Team.objects.create(
+            name="Home Quick Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        Participant.objects.create(
+            team=team,
+            full_name="Member One",
+            email=self.participant_user.email,
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        self.client.force_login(self.participant_user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Швидкий блок команди")
+        self.assertContains(response, "Home Quick Team")
+        self.assertContains(response, tournament.name)
+        self.assertContains(response, task.title)
+        self.assertContains(response, reverse("team_detail", args=[team.id]))
+        self.assertContains(response, reverse("public_tournament_detail", args=[tournament.id]))
+
     def test_admin_login_redirects_to_home_with_admin_actions(self):
         self.client.force_login(self.admin_user)
 

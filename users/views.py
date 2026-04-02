@@ -89,6 +89,30 @@ def build_team_detail_context(request, team, participant_form=None):
     }
 
 
+def get_primary_team_with_quick_overview(user):
+    if not getattr(user, 'is_authenticated', False):
+        return None, None
+
+    teams = Team.objects.filter(
+        Q(captain_user=user) | Q(participants__email=user.email)
+    ).select_related('captain_user').prefetch_related(
+        'participants',
+        'registrations__tournament',
+    ).distinct().order_by('name')
+
+    fallback_team = None
+    fallback_overview = None
+    for team in teams:
+        overview = build_team_quick_overview(team)
+        if fallback_team is None:
+            fallback_team = team
+            fallback_overview = overview
+        if overview is not None:
+            return team, overview
+
+    return fallback_team, fallback_overview
+
+
 def send_platform_email(to_email, subject, message):
     provider = getattr(settings, 'EMAIL_DELIVERY_PROVIDER', '')
 
@@ -807,6 +831,7 @@ def home(request):
     tournament_rows = build_public_tournament_rows()
     announcements = build_public_announcements()
     notification_context = build_notification_nav_context(request.user)
+    home_team, home_team_quick_overview = get_primary_team_with_quick_overview(request.user)
     filter_status = request.GET.get('status', 'all')
     filter_options = {'all', 'registration', 'running', 'finished', 'scheduled'}
     if filter_status not in filter_options:
@@ -878,6 +903,8 @@ def home(request):
         'upcoming_tournaments': upcoming_tournaments[:3],
         'news_rows': news_rows,
         'announcements': announcements,
+        'home_team': home_team,
+        'home_team_quick_overview': home_team_quick_overview,
         **notification_context,
     })
 

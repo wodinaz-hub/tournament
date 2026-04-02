@@ -771,6 +771,17 @@ def home(request):
     if filter_status not in filter_options:
         filter_status = 'all'
 
+    for row in tournament_rows:
+        tournament = row['tournament']
+        if tournament.is_registration_open:
+            row['filter_bucket'] = 'registration'
+        elif tournament.is_running:
+            row['filter_bucket'] = 'running'
+        elif tournament.is_finished:
+            row['filter_bucket'] = 'finished'
+        else:
+            row['filter_bucket'] = 'scheduled'
+
     featured_tournaments = [row for row in tournament_rows if row['tournament'].is_registration_open]
     active_tournaments = [row for row in tournament_rows if row['tournament'].is_running]
     finished_tournaments = [row for row in tournament_rows if row['tournament'].is_finished]

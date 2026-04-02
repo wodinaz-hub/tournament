@@ -346,6 +346,17 @@ class TournamentPlatformViewTests(TestCase):
         filtered_names = [row["tournament"].name for row in response.context["filtered_tournament_rows"]]
         self.assertEqual(filtered_names, ["Registration Cup"])
 
+    def test_home_page_renders_client_side_filter_attributes(self):
+        self.create_tournament(name="Filter Cup")
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-home-filter="all"', html=False)
+        self.assertContains(response, 'data-home-filter="registration"', html=False)
+        self.assertContains(response, 'data-filter-bucket="', html=False)
+        self.assertContains(response, "tournament-filter-empty", html=False)
+
     def test_admin_login_redirects_to_home_with_admin_actions(self):
         self.client.force_login(self.admin_user)
 

@@ -211,6 +211,10 @@
             color: var(--primary);
             border-color: #bcd0f4;
         }
+        .card[hidden],
+        .empty[hidden] {
+            display: none !important;
+        }
         .grid-3 {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -427,14 +431,23 @@
                     <a
                         class="chip{% if filter_status == option.value %} active{% endif %}"
                         href="{% url 'home' %}?status={{ option.value }}"
+                        data-home-filter="{{ option.value }}"
+                        aria-pressed="{% if filter_status == option.value %}true{% else %}false{% endif %}"
                     >
                         {{ option.label }}
                     </a>
                 {% endfor %}
+                <div class="card empty" id="tournament-filter-empty" hidden>
+                    Р—Р° С†РёРј С„С–Р»СЊС‚СЂРѕРј С‚СѓСЂРЅС–СЂС–РІ РїРѕРєРё РЅРµРјР°С”.
+                </div>
             </div>
             <div class="grid-3">
-                {% for row in filtered_tournament_rows %}
-                    <a class="card card-link" href="{% url 'public_tournament_detail' row.tournament.id %}">
+                {% for row in tournament_rows %}
+                    <a
+                        class="card card-link"
+                        href="{% url 'public_tournament_detail' row.tournament.id %}"
+                        data-filter-bucket="{{ row.filter_bucket }}"
+                    >
                         <div class="card-top">
                             <h3 style="margin:0;">{{ row.tournament.name }}</h3>
                             <span class="status-badge status-{{ row.tournament.lifecycle_status }}">
@@ -557,6 +570,60 @@
                 }
             });
         });
+
+        (function () {
+            const filterLinks = Array.from(document.querySelectorAll('[data-home-filter]'));
+            const tournamentCards = Array.from(document.querySelectorAll('[data-filter-bucket]'));
+            const emptyState = document.getElementById('tournament-filter-empty');
+            if (!filterLinks.length || !tournamentCards.length || !emptyState) {
+                return;
+            }
+
+            function applyHomeFilter(status, updateUrl) {
+                let visibleCount = 0;
+
+                filterLinks.forEach(function (link) {
+                    const isActive = link.dataset.homeFilter === status;
+                    link.classList.toggle('active', isActive);
+                    link.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                });
+
+                tournamentCards.forEach(function (card) {
+                    const matches = status === 'all' || card.dataset.filterBucket === status;
+                    card.hidden = !matches;
+                    if (matches) {
+                        visibleCount += 1;
+                    }
+                });
+
+                emptyState.hidden = visibleCount > 0;
+
+                if (updateUrl) {
+                    const url = new URL(window.location.href);
+                    if (status === 'all') {
+                        url.searchParams.delete('status');
+                    } else {
+                        url.searchParams.set('status', status);
+                    }
+                    window.history.replaceState({}, '', url);
+                }
+            }
+
+            filterLinks.forEach(function (link) {
+                link.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    applyHomeFilter(link.dataset.homeFilter, true);
+                });
+            });
+
+            window.addEventListener('popstate', function () {
+                const url = new URL(window.location.href);
+                const status = url.searchParams.get('status') || 'all';
+                applyHomeFilter(status, false);
+            });
+
+            applyHomeFilter('{{ filter_status|escapejs }}', false);
+        }());
     </script>
 </body>
 </html>

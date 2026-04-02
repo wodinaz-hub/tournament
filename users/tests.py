@@ -27,6 +27,7 @@ from tournament.models import (
     Task,
     Team,
     Tournament,
+    TournamentScheduleItem,
     TournamentRegistration,
 )
 
@@ -659,6 +660,81 @@ class TournamentPlatformViewTests(TestCase):
         self.assertContains(response, "Діскорд")
         self.assertNotContains(response, "Телеграм")
         self.assertNotContains(response, "Вайбер")
+
+    def test_create_tournament_requires_schedule_for_published_tournament(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_tournament"),
+            {
+                "name": "No Schedule Cup",
+                "description": "Tournament without schedule",
+                "registration_form_description": "",
+                "registration_fields_definition": "",
+                "schedule_definition": "",
+                "allowed_contact_methods": ["telegram"],
+                "start_date": (timezone.now() + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+                "end_date": (timezone.now() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
+                "registration_start": timezone.now().strftime("%Y-%m-%dT%H:%M"),
+                "registration_end": (timezone.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),
+                "min_team_members": 2,
+                "max_team_members": 4,
+                "max_teams": 20,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "хоча б одну подію розкладу")
+        self.assertFalse(Tournament.objects.filter(name="No Schedule Cup").exists())
+
+    def test_create_tournament_saves_schedule_items(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_tournament"),
+            {
+                "name": "Schedule Cup",
+                "description": "Tournament with schedule",
+                "registration_form_description": "",
+                "registration_fields_definition": "",
+                "schedule_definition": "2030-05-01T10:00|Старт реєстрації|Початок прийому заявок\n2030-05-03T18:00|Онлайн-консультація|Питання та відповіді",
+                "allowed_contact_methods": ["telegram"],
+                "start_date": (timezone.now() + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+                "end_date": (timezone.now() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
+                "registration_start": timezone.now().strftime("%Y-%m-%dT%H:%M"),
+                "registration_end": (timezone.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),
+                "min_team_members": 2,
+                "max_team_members": 4,
+                "max_teams": 20,
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_active_tournaments"))
+        tournament = Tournament.objects.get(name="Schedule Cup")
+        self.assertEqual(tournament.schedule_items.count(), 2)
+        self.assertTrue(TournamentScheduleItem.objects.filter(tournament=tournament, title="Старт реєстрації").exists())
+
+    def test_public_and_jury_pages_show_tournament_schedule(self):
+        tournament = self.create_tournament()
+        TournamentScheduleItem.objects.create(
+            tournament=tournament,
+            title="Перша консультація",
+            starts_at=timezone.now() + timedelta(hours=2),
+            description="Розбір вимог і дедлайнів",
+            position=0,
+        )
+        tournament.jury_users.add(self.jury_user)
+
+        public_response = self.client.get(reverse("public_tournament_detail", args=[tournament.id]))
+        self.assertEqual(public_response.status_code, 200)
+        self.assertContains(public_response, "Розклад турніру")
+        self.assertContains(public_response, "Перша консультація")
+
+        self.client.force_login(self.jury_user)
+        jury_response = self.client.get(reverse("jury_tournament_detail", args=[tournament.id]))
+        self.assertEqual(jury_response.status_code, 200)
+        self.assertContains(jury_response, "Розклад турніру")
+        self.assertContains(jury_response, "Перша консультація")
 
 
     def test_admin_can_create_user_from_users_tab(self):

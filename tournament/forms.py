@@ -16,6 +16,7 @@ from .models import (
     Task,
     Team,
     Tournament,
+    TournamentScheduleItem,
     TournamentRegistration,
 )
 from .validators import validate_school_name
@@ -109,6 +110,59 @@ def serialize_registration_fields_definition(config):
     return '\n'.join(lines)
 
 
+def parse_schedule_definition(raw_value):
+    config = []
+    errors = []
+
+    for index, raw_line in enumerate((raw_value or '').splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        parts = [part.strip() for part in line.split('|', 2)]
+        if len(parts) < 2:
+            errors.append(f'Рядок {index}: потрібно вказати дату, час і назву події.')
+            continue
+
+        raw_datetime = parts[0]
+        title = parts[1]
+        description = parts[2] if len(parts) > 2 else ''
+
+        if not title:
+            errors.append(f'Рядок {index}: вкажіть назву події.')
+            continue
+
+        try:
+            starts_at = datetime.strptime(raw_datetime, '%Y-%m-%dT%H:%M')
+        except ValueError:
+            errors.append(f'Рядок {index}: некоректна дата або час події.')
+            continue
+
+        if timezone.is_naive(starts_at):
+            starts_at = timezone.make_aware(starts_at, timezone.get_current_timezone())
+
+        config.append({
+            'starts_at': trim_datetime_to_minute(starts_at),
+            'title': title,
+            'description': description,
+        })
+
+    if errors:
+        raise ValidationError(errors)
+
+    return config
+
+
+def serialize_schedule_definition(items):
+    lines = []
+    for item in items or []:
+        starts_at = item.get('starts_at')
+        if isinstance(starts_at, datetime):
+            starts_at = to_local_form_datetime(starts_at).strftime('%Y-%m-%dT%H:%M')
+        lines.append(f"{starts_at}|{item.get('title', '')}|{item.get('description', '')}")
+    return '\n'.join(lines)
+
+
 def trim_datetime_to_minute(value):
     if not isinstance(value, datetime):
         return value
@@ -134,6 +188,12 @@ class TournamentForm(forms.ModelForm):
         required=False,
         label='Додаткові поля анкети',
         help_text='Кожен рядок: код_поля|Назва поля|тип|required або optional. Типи: text, textarea, email, number, url.',
+        widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 6}),
+    )
+    schedule_definition = forms.CharField(
+        required=False,
+        label='Розклад турніру',
+        help_text='Кожен рядок: YYYY-MM-DDTHH:MM|Назва події|Опис події.',
         widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 6}),
     )
     start_date = forms.DateTimeField(
@@ -202,6 +262,17 @@ class TournamentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         config = self.instance.registration_fields_config if getattr(self.instance, 'pk', None) else []
         self.fields['registration_fields_definition'].initial = serialize_registration_fields_definition(config)
+        schedule_items = []
+        if getattr(self.instance, 'pk', None):
+            schedule_items = [
+                {
+                    'starts_at': item.starts_at,
+                    'title': item.title,
+                    'description': item.description,
+                }
+                for item in self.instance.schedule_items.all()
+            ]
+        self.fields['schedule_definition'].initial = serialize_schedule_definition(schedule_items)
         self.fields['allowed_contact_methods'].initial = (
             getattr(self.instance, 'effective_allowed_contact_methods', None)
             or Tournament.DEFAULT_CONTACT_METHODS
@@ -211,6 +282,7 @@ class TournamentForm(forms.ModelForm):
             'description',
             'registration_form_description',
             'registration_fields_definition',
+            'schedule_definition',
             'allowed_contact_methods',
             'start_date',
             'end_date',
@@ -241,6 +313,7 @@ class TournamentForm(forms.ModelForm):
         cleaned_data['name'] = name
         cleaned_data['description'] = description
         registration_fields_definition = cleaned_data.get('registration_fields_definition', '')
+        schedule_definition = cleaned_data.get('schedule_definition', '')
         allowed_contact_methods = cleaned_data.get('allowed_contact_methods') or []
         cleaned_data['allowed_contact_methods'] = allowed_contact_methods
 
@@ -251,6 +324,12 @@ class TournamentForm(forms.ModelForm):
         except ValidationError as exc:
             for error in exc.messages:
                 self.add_error('registration_fields_definition', error)
+
+        try:
+            cleaned_data['schedule_items_config'] = parse_schedule_definition(schedule_definition)
+        except ValidationError as exc:
+            for error in exc.messages:
+                self.add_error('schedule_definition', error)
 
         if not allowed_contact_methods:
             self.add_error('allowed_contact_methods', "Залиште принаймні один спосіб зв'язку для команди.")
@@ -269,6 +348,9 @@ class TournamentForm(forms.ModelForm):
         for field_name, value in required_fields.items():
             if value in [None, '']:
                 self.add_error(field_name, 'Це поле є обов’язковим для опублікованого турніру.')
+
+        if not cleaned_data.get('schedule_items_config'):
+            self.add_error('schedule_definition', 'Для опублікованого турніру додайте хоча б одну подію розкладу.')
 
         if registration_start and registration_end and registration_start >= registration_end:
             self.add_error('registration_end', 'Завершення реєстрації має бути пізніше за початок реєстрації.')
@@ -298,6 +380,21 @@ class TournamentForm(forms.ModelForm):
         if commit:
             instance.save()
             self.save_m2m()
+            instance.schedule_items.all().delete()
+            schedule_items = self.cleaned_data.get('schedule_items_config', [])
+            if schedule_items:
+                TournamentScheduleItem.objects.bulk_create(
+                    [
+                        TournamentScheduleItem(
+                            tournament=instance,
+                            starts_at=item['starts_at'],
+                            title=item['title'],
+                            description=item.get('description', ''),
+                            position=index,
+                        )
+                        for index, item in enumerate(schedule_items)
+                    ]
+                )
         return instance
 
 

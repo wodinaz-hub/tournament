@@ -10,10 +10,13 @@
         .card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.06); }
         details.team-folder { border: 1px solid #dbe1ea; border-radius: 14px; background: #fbfdff; padding: 14px 16px; margin-bottom: 14px; }
         details.team-folder summary { cursor: pointer; font-size: 18px; font-weight: 700; }
-        .submission { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-top: 12px; background: white; }
+        .submission, .schedule-item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-top: 12px; background: white; }
         .meta { color: #555; line-height: 1.6; }
         .links a { color: #2563eb; text-decoration: none; word-break: break-all; }
-        .btn, .logout { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: white; padding: 8px 12px; border-radius: 9px; min-height: 36px; font-size: 13px; line-height: 1.2; font-weight: 600; }
+        .btn, .logout {
+            display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+            color: white; padding: 8px 12px; border-radius: 9px; min-height: 36px; font-size: 13px; line-height: 1.2; font-weight: 600;
+        }
         .btn { background: #2563eb; }
         .logout { background: #dc2626; }
         .section { margin-top: 12px; }
@@ -37,6 +40,21 @@
                 <a class="btn" href="{% url 'jury_dashboard' %}">Назад до турнірів</a>
                 <a class="logout" href="{% url 'logout' %}">Вийти</a>
             </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+            <h2 style="margin-top: 0;">Розклад турніру</h2>
+            {% for item in tournament.schedule_items.all %}
+                <div class="schedule-item">
+                    <strong>{{ item.title }}</strong>
+                    <div class="meta">{{ item.starts_at|date:"d.m.Y H:i" }}</div>
+                    {% if item.description %}
+                        <div class="meta" style="margin-top:8px;">{{ item.description|linebreaksbr }}</div>
+                    {% endif %}
+                </div>
+            {% empty %}
+                <div class="meta">Розклад турніру ще не додано.</div>
+            {% endfor %}
         </div>
 
         <div class="card" style="margin-bottom: 20px;">

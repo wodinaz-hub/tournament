@@ -1127,7 +1127,7 @@ def redirect_by_role(request):
 
 def public_tournament_detail(request, tournament_id):
     tournament = get_object_or_404(
-        Tournament.objects.prefetch_related('tasks').select_related('created_by'),
+        Tournament.objects.prefetch_related('tasks', 'schedule_items').select_related('created_by'),
         id=tournament_id,
         is_draft=False,
     )
@@ -1448,10 +1448,8 @@ def create_tournament(request):
     if request.method == 'POST':
         form = TournamentForm(request.POST)
         if form.is_valid():
-            tournament = form.save(commit=False)
-            tournament.created_by = request.user
-            tournament.save()
-            form.save_m2m()
+            form.instance.created_by = request.user
+            tournament = form.save()
             return redirect(reverse('admin_active_tournaments') if is_admin_user(request.user) else get_dashboard_url_for_user(request.user))
         if is_admin_user(request.user):
             return render_admin_section(
@@ -2296,7 +2294,11 @@ def tournament_tasks(request, tournament_id):
 
 @login_required
 def tournament_leaderboard(request, tournament_id):
-    tournament = get_object_or_404(Tournament, id=tournament_id, is_draft=False)
+    tournament = get_object_or_404(
+        Tournament.objects.prefetch_related('schedule_items'),
+        id=tournament_id,
+        is_draft=False,
+    )
     if not tournament.evaluation_results_ready and not request.user.is_superuser:
         return redirect('tournament_tasks', tournament_id=tournament.id)
     approved_registrations = TournamentRegistration.objects.filter(

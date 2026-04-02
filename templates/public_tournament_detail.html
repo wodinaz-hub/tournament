@@ -30,9 +30,7 @@
         }
         .section-title { margin: 0 0 14px; font-size: 24px; }
         .meta { color: #64748b; line-height: 1.7; }
-        .hint, .warning, .success {
-            padding: 14px; border-radius: 12px; line-height: 1.6; margin-bottom: 14px;
-        }
+        .hint, .warning, .success { padding: 14px; border-radius: 12px; line-height: 1.6; margin-bottom: 14px; }
         .hint { background: #eef5ff; color: #244a7c; }
         .warning { background: #fff7e8; color: #8a5a00; }
         .success { background: #ecfdf5; color: #166534; }
@@ -43,9 +41,9 @@
         }
         textarea { min-height: 110px; resize: vertical; }
         .field-errors { color: #b00020; font-size: 14px; margin: -6px 0 10px; }
-        .field-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #fafcff; }
-        .required { color: #b91c1c; }
-        .task-item, .leader-item { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; margin-bottom: 12px; background: #fbfdff; }
+        .field-card, .task-item, .leader-item {
+            border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; margin-bottom: 12px; background: #fbfdff;
+        }
         .participants-wrap { border: 1px solid #dbe7f3; background: #f8fbff; border-radius: 12px; padding: 14px; }
         .participant-row { border: 1px solid #dbe3ee; background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
         .participant-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
@@ -97,6 +95,21 @@
                         Той, хто подає заявку від команди, автоматично стає контактною особою (капітаном).
                         Доступ до завдань відкривається лише після схвалення заявки організатором.
                     </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="section-title">Розклад турніру</h2>
+                    {% for item in tournament.schedule_items.all %}
+                        <div class="task-item">
+                            <strong>{{ item.title }}</strong>
+                            <div class="meta">{{ item.starts_at|date:"d.m.Y H:i" }}</div>
+                            {% if item.description %}
+                                <div class="meta" style="margin-top:8px;">{{ item.description|linebreaksbr }}</div>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="meta">Розклад турніру ще не додано.</div>
+                    {% endfor %}
                 </div>
 
                 <div class="card">
@@ -153,7 +166,7 @@
                             {% for field in registration_form %}
                                 {% if field.name != "team_name" and field.name != "captain_name" and field.name != "captain_email" and field.name != "school" and field.name != "preferred_contact_method" and field.name != "preferred_contact_value" %}
                                     <div class="field-card">
-                                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required">*</span>{% endif %}</label>
+                                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#b91c1c;">*</span>{% endif %}</label>
                                         {% if field.field.widget.attrs.data_field_type == "participants" %}
                                             {{ field }}
                                             <div class="participants-wrap" data-target-id="{{ field.auto_id }}">
@@ -258,20 +271,29 @@
                 emailInput.value = data.email || "";
                 nameInput.addEventListener("input", () => syncParticipants(container));
                 emailInput.addEventListener("input", () => syncParticipants(container));
-                removeButton.addEventListener("click", () => { row.remove(); syncParticipants(container); });
+                removeButton.addEventListener("click", () => {
+                    row.remove();
+                    syncParticipants(container);
+                });
                 container.querySelector(".participants-list").appendChild(row);
                 syncParticipants(container);
             }
             document.querySelectorAll(".participants-wrap").forEach((container) => {
+                const addButton = container.querySelector(".add-participant-btn");
                 const hiddenInput = document.getElementById(container.dataset.targetId);
                 let initialPayload = [];
-                try { initialPayload = hiddenInput.value ? JSON.parse(hiddenInput.value) : []; } catch (error) { initialPayload = []; }
+                if (hiddenInput.value) {
+                    try {
+                        initialPayload = JSON.parse(hiddenInput.value);
+                    } catch (e) {
+                        initialPayload = [];
+                    }
+                }
                 if (initialPayload.length) {
                     initialPayload.forEach((item) => addRow(container, item));
-                } else {
-                    addRow(container);
                 }
-                container.querySelector(".add-participant-btn").addEventListener("click", () => addRow(container));
+                addButton.addEventListener("click", () => addRow(container));
+                syncParticipants(container);
             });
         })();
     </script>

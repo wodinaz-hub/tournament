@@ -54,6 +54,7 @@
         .builder { border:1px solid #dbe3ee; background:#f8fbff; border-radius:18px; padding:16px; }
         .builder-row { border:1px solid #dbe3ee; background:#fff; border-radius:14px; padding:14px; margin-bottom:12px; }
         .builder-grid { display:grid; grid-template-columns:1.8fr 1fr auto auto; gap:10px; align-items:center; }
+        .schedule-grid { display:grid; grid-template-columns:1.1fr 1.2fr 1.6fr auto; gap:10px; align-items:center; }
         .builder-check { display:flex; align-items:center; gap:8px; font-weight:700; color:#334155; }
         .builder-check input { width:auto; margin:0; }
         .task-list { display:grid; gap:10px; margin-top:14px; padding-top:14px; border-top:1px solid #dde5ef; }
@@ -134,6 +135,9 @@
                     <div class="section-head" style="margin-top:18px"><div><h3 style="margin:0;font-size:24px">Поля анкети</h3><div class="section-note">Організатор може зібрати форму реєстрації без окремої сторінки.</div></div><button type="button" class="btn-sec" id="add-field">Додати поле</button></div>
                     <div class="builder"><div id="registration-fields-builder"></div><div id="builder-empty" class="empty">Поки що додаткових полів немає.</div></div>
                     <div class="hidden">{{ tournament_form.registration_fields_definition }}</div>{% if tournament_form.registration_fields_definition.errors %}<div class="err">{{ tournament_form.registration_fields_definition.errors }}</div>{% endif %}
+                    <div class="section-head" style="margin-top:18px"><div><h3 style="margin:0;font-size:24px">Розклад турніру</h3><div class="section-note">Додайте етапи, консультації, дедлайни та інші події, які бачитимуть учасники та журі.</div></div><button type="button" class="btn-sec" id="add-schedule-item">Додати подію</button></div>
+                    <div class="builder"><div id="schedule-builder"></div><div id="schedule-builder-empty" class="empty">Поки що подій розкладу немає.</div></div>
+                    <div class="hidden">{{ tournament_form.schedule_definition }}</div>{% if tournament_form.schedule_definition.errors %}<div class="err">{{ tournament_form.schedule_definition.errors }}</div>{% endif %}
                     <div class="fields" style="margin-top:18px">
                         <div><label>Дата початку</label>{{ tournament_form.start_date }}{% if tournament_form.start_date.errors %}<div class="err">{{ tournament_form.start_date.errors }}</div>{% endif %}</div>
                         <div><label>Дата завершення</label>{{ tournament_form.end_date }}{% if tournament_form.end_date.errors %}<div class="err">{{ tournament_form.end_date.errors }}</div>{% endif %}</div>
@@ -170,16 +174,26 @@
 </div>
 
 <template id="registration-field-template"><div class="builder-row"><div class="builder-grid"><input type="text" class="builder-label" placeholder="Назва поля"><select class="builder-type"><option value="text">Короткий текст</option><option value="textarea">Великий текст</option><option value="email">Електронна пошта</option><option value="number">Число</option><option value="url">Посилання</option><option value="participants">Учасники</option></select><label class="builder-check"><input type="checkbox" class="builder-required" checked>Обов'язкове</label><button type="button" class="btn-danger builder-remove">Видалити</button></div></div></template>
+<template id="schedule-item-template"><div class="builder-row"><div class="schedule-grid"><input type="datetime-local" class="schedule-starts-at"><input type="text" class="schedule-title" placeholder="Назва події"><input type="text" class="schedule-description" placeholder="Короткий опис"><button type="button" class="btn-danger schedule-remove">Видалити</button></div></div></template>
 <script>
 (function () {
     const hiddenField = document.getElementById('id_registration_fields_definition');
     const builder = document.getElementById('registration-fields-builder');
     const emptyState = document.getElementById('builder-empty');
     const template = document.getElementById('registration-field-template');
+    const scheduleHiddenField = document.getElementById('id_schedule_definition');
+    const scheduleBuilder = document.getElementById('schedule-builder');
+    const scheduleEmptyState = document.getElementById('schedule-builder-empty');
+    const scheduleTemplate = document.getElementById('schedule-item-template');
     const form = document.getElementById('inline-tournament-form');
     const addButton = document.getElementById('add-field');
+    const addScheduleButton = document.getElementById('add-schedule-item');
     if (!hiddenField || !builder || !emptyState || !template || !form || !addButton) { return; }
     function updateEmptyState() { emptyState.style.display = builder.children.length ? 'none' : 'block'; }
+    function updateScheduleEmptyState() {
+        if (!scheduleEmptyState || !scheduleBuilder) { return; }
+        scheduleEmptyState.style.display = scheduleBuilder.children.length ? 'none' : 'block';
+    }
     function syncHiddenField() {
         const rows = builder.querySelectorAll('.builder-row');
         const lines = Array.from(rows).map(function (row) {
@@ -191,6 +205,19 @@
         }).filter(Boolean);
         hiddenField.value = lines.join('\n');
         updateEmptyState();
+    }
+    function syncScheduleField() {
+        if (!scheduleHiddenField || !scheduleBuilder) { return; }
+        const rows = scheduleBuilder.querySelectorAll('.builder-row');
+        const lines = Array.from(rows).map(function (row) {
+            const startsAt = row.querySelector('.schedule-starts-at').value.trim();
+            const title = row.querySelector('.schedule-title').value.trim();
+            const description = row.querySelector('.schedule-description').value.trim();
+            if (!startsAt && !title && !description) { return ''; }
+            return startsAt + '|' + title + '|' + description;
+        }).filter(Boolean);
+        scheduleHiddenField.value = lines.join('\n');
+        updateScheduleEmptyState();
     }
     function addRow(data) {
         const safeData = data || {};
@@ -210,6 +237,25 @@
         builder.appendChild(row);
         syncHiddenField();
     }
+    function addScheduleRow(data) {
+        if (!scheduleTemplate || !scheduleBuilder) { return; }
+        const safeData = data || {};
+        const fragment = scheduleTemplate.content.cloneNode(true);
+        const row = fragment.querySelector('.builder-row');
+        const startsAtInput = row.querySelector('.schedule-starts-at');
+        const titleInput = row.querySelector('.schedule-title');
+        const descriptionInput = row.querySelector('.schedule-description');
+        const removeButton = row.querySelector('.schedule-remove');
+        startsAtInput.value = safeData.starts_at || '';
+        titleInput.value = safeData.title || '';
+        descriptionInput.value = safeData.description || '';
+        startsAtInput.addEventListener('input', syncScheduleField);
+        titleInput.addEventListener('input', syncScheduleField);
+        descriptionInput.addEventListener('input', syncScheduleField);
+        removeButton.addEventListener('click', function () { row.remove(); syncScheduleField(); });
+        scheduleBuilder.appendChild(row);
+        syncScheduleField();
+    }
     function parseExistingDefinition() {
         const raw = hiddenField.value.trim();
         if (!raw) { updateEmptyState(); return; }
@@ -220,10 +266,35 @@
             addRow({ label: parts[1] || '', type: parts[2] || 'text', required: parts[3] !== 'optional' });
         });
     }
+    function parseExistingSchedule() {
+        if (!scheduleHiddenField || !scheduleBuilder) { return; }
+        const raw = scheduleHiddenField.value.trim();
+        if (!raw) { updateScheduleEmptyState(); return; }
+        raw.split('\n').forEach(function (line) {
+            const trimmed = line.trim();
+            if (!trimmed) { return; }
+            const parts = trimmed.split('|');
+            addScheduleRow({
+                starts_at: parts[0] || '',
+                title: parts[1] || '',
+                description: parts[2] || '',
+            });
+        });
+    }
     addButton.addEventListener('click', function () { addRow({ type: 'text', required: true }); });
-    form.addEventListener('submit', syncHiddenField);
+    if (addScheduleButton) {
+        addScheduleButton.addEventListener('click', function () {
+            addScheduleRow({ starts_at: '', title: '', description: '' });
+        });
+    }
+    form.addEventListener('submit', function () {
+        syncHiddenField();
+        syncScheduleField();
+    });
     parseExistingDefinition();
+    parseExistingSchedule();
     updateEmptyState();
+    updateScheduleEmptyState();
 })();
 </script>
 </body>

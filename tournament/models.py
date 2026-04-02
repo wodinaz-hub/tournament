@@ -177,6 +177,27 @@ class Tournament(models.Model):
         return "Оцінювання ще не завершено"
 
 
+class TournamentScheduleItem(models.Model):
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="schedule_items",
+        verbose_name="Турнір",
+    )
+    title = models.CharField(max_length=255, verbose_name="Назва події")
+    starts_at = models.DateTimeField(db_index=True, verbose_name="Дата та час")
+    description = models.TextField(blank=True, default="", verbose_name="Опис події")
+    position = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        ordering = ["starts_at", "position", "id"]
+        verbose_name = "Подія розкладу турніру"
+        verbose_name_plural = "Події розкладу турніру"
+
+    def __str__(self):
+        return f"{self.title} ({self.tournament.name})"
+
+
 class Team(models.Model):
     class ContactMethod(models.TextChoices):
         TELEGRAM = "telegram", "Телеграм"

@@ -165,7 +165,7 @@
             <div class="page-header">
                 <div>
                     <h1>{% if mode == 'edit' %}Редагувати турнір{% else %}Створити турнір{% endif %}</h1>
-                    <div class="page-subtitle">***? **?? ***?? * **?, ***?? *?, **? ***?? ?? *?? *?.</div>
+                    <div class="page-subtitle">Налаштуйте опис, часові рамки, анкету реєстрації, розклад подій та список завдань турніру.</div>
                 </div>
                 <a class="back-link" href="{{ dashboard_url|default:'/dashboard/tournaments/active/' }}">Назад до кабінету</a>
             </div>
@@ -215,13 +215,27 @@
                             <h2 class="section-title">Поля анкети</h2>
                             <button type="button" class="btn-ghost" id="add-field">Додати поле</button>
                         </div>
-            <p class="section-note">Тут додаються додаткові поля, які контактна особа команди заповнює під час подачі заявки на турнір.</p>
+                        <p class="section-note">Тут додаються додаткові поля, які контактна особа команди заповнює під час подачі заявки на турнір.</p>
                         <div class="builder">
                             <div id="registration-fields-builder"></div>
                             <div id="builder-empty" class="empty">Поки що додаткових полів немає.</div>
                         </div>
                         <div class="hidden-source">{{ form.registration_fields_definition }}</div>
                         {% if form.registration_fields_definition.errors %}<div class="field-errors">{{ form.registration_fields_definition.errors }}</div>{% endif %}
+                    </section>
+
+                    <section class="section-card">
+                        <div class="section-header">
+                            <h2 class="section-title">Розклад турніру</h2>
+                            <button type="button" class="btn-ghost" id="add-schedule-item">Додати подію</button>
+                        </div>
+                        <p class="section-note">Заплануйте етапи турніру, консультації, дедлайни та інші події. Для опублікованого турніру має бути хоча б один пункт розкладу.</p>
+                        <div class="builder">
+                            <div id="schedule-builder"></div>
+                            <div id="schedule-builder-empty" class="empty">Поки що подій розкладу немає.</div>
+                        </div>
+                        <div class="hidden-source">{{ form.schedule_definition }}</div>
+                        {% if form.schedule_definition.errors %}<div class="field-errors">{{ form.schedule_definition.errors }}</div>{% endif %}
                     </section>
 
                     <section class="section-card">
@@ -338,6 +352,28 @@
         </div>
     </template>
 
+    <template id="schedule-item-template">
+        <div class="field-builder-row">
+            <div class="fields-grid">
+                <div class="field-group">
+                    <label>Дата та час</label>
+                    <input type="datetime-local" class="schedule-datetime form-input">
+                </div>
+                <div class="field-group">
+                    <label>Назва події</label>
+                    <input type="text" class="schedule-title form-input" placeholder="Наприклад, Онлайн-консультація">
+                </div>
+                <div class="field-group field-span-2">
+                    <label>Опис події</label>
+                    <textarea class="schedule-description form-input" rows="3" placeholder="Що відбудеться під час цієї події"></textarea>
+                </div>
+            </div>
+            <div class="actions-bar" style="margin-top:12px;">
+                <button type="button" class="btn-danger schedule-remove">Видалити</button>
+            </div>
+        </div>
+    </template>
+
     <script>
         (function () {
             const hiddenField = document.getElementById("id_registration_fields_definition");
@@ -417,10 +453,85 @@
             parseExistingDefinition();
             updateEmptyState();
         })();
+
+        (function () {
+            const hiddenField = document.getElementById("id_schedule_definition");
+            const builder = document.getElementById("schedule-builder");
+            const emptyState = document.getElementById("schedule-builder-empty");
+            const template = document.getElementById("schedule-item-template");
+            const form = document.getElementById("tournament-form");
+            const addButton = document.getElementById("add-schedule-item");
+
+            function updateEmptyState() {
+                emptyState.style.display = builder.children.length ? "none" : "block";
+            }
+
+            function syncHiddenField() {
+                const rows = builder.querySelectorAll(".field-builder-row");
+                const lines = Array.from(rows).map((row) => {
+                    const startsAt = row.querySelector(".schedule-datetime").value.trim();
+                    const title = row.querySelector(".schedule-title").value.trim();
+                    const description = row.querySelector(".schedule-description").value.trim();
+                    if (!startsAt || !title) {
+                        return "";
+                    }
+                    return `${startsAt}|${title}|${description}`;
+                }).filter(Boolean);
+                hiddenField.value = lines.join("\n");
+                updateEmptyState();
+            }
+
+            function addRow(data = {}) {
+                const fragment = template.content.cloneNode(true);
+                const row = fragment.querySelector(".field-builder-row");
+                const startsAtInput = row.querySelector(".schedule-datetime");
+                const titleInput = row.querySelector(".schedule-title");
+                const descriptionInput = row.querySelector(".schedule-description");
+                const removeButton = row.querySelector(".schedule-remove");
+
+                startsAtInput.value = data.startsAt || "";
+                titleInput.value = data.title || "";
+                descriptionInput.value = data.description || "";
+
+                startsAtInput.addEventListener("input", syncHiddenField);
+                titleInput.addEventListener("input", syncHiddenField);
+                descriptionInput.addEventListener("input", syncHiddenField);
+                removeButton.addEventListener("click", function () {
+                    row.remove();
+                    syncHiddenField();
+                });
+
+                builder.appendChild(row);
+                syncHiddenField();
+            }
+
+            function parseExistingDefinition() {
+                const raw = hiddenField.value.trim();
+                if (!raw) {
+                    updateEmptyState();
+                    return;
+                }
+                raw.split("\n").forEach((line) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) {
+                        return;
+                    }
+                    const parts = trimmed.split("|");
+                    addRow({
+                        startsAt: parts[0] || "",
+                        title: parts[1] || "",
+                        description: parts.slice(2).join("|"),
+                    });
+                });
+            }
+
+            addButton.addEventListener("click", function () {
+                addRow();
+            });
+            form.addEventListener("submit", syncHiddenField);
+            parseExistingDefinition();
+            updateEmptyState();
+        })();
     </script>
 </body>
 </html>
-
-
-
-

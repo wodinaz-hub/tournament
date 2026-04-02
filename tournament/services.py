@@ -7,6 +7,7 @@ from django.db import models, transaction
 from users.models import CustomUser
 
 from .models import RegistrationMember, Team, Tournament, TournamentRegistration
+from .validators import validate_school_name
 
 
 class RegistrationService:
@@ -106,6 +107,7 @@ class RegistrationService:
             raise ValidationError("Вкажіть зручний спосіб зв'язку.")
         if not preferred_contact_value:
             raise ValidationError("Вкажіть контакт для зв'язку.")
+        school = validate_school_name(school)
         try:
             validate_email(captain_email)
         except ValidationError as exc:

@@ -18,6 +18,7 @@ from .models import (
     Tournament,
     TournamentRegistration,
 )
+from .validators import validate_school_name
 from users.models import CustomUser
 
 
@@ -318,6 +319,11 @@ class TeamForm(forms.ModelForm):
         cleaned_data['school'] = (cleaned_data.get('school') or '').strip()
         cleaned_data['preferred_contact_value'] = (cleaned_data.get('preferred_contact_value') or '').strip()
 
+        try:
+            cleaned_data['school'] = validate_school_name(cleaned_data.get('school'))
+        except ValidationError as exc:
+            self.add_error('school', exc)
+
         preferred_contact_method = cleaned_data.get('preferred_contact_method') or ''
         preferred_contact_value = cleaned_data.get('preferred_contact_value') or ''
         if not preferred_contact_method:
@@ -510,6 +516,10 @@ class TournamentRegistrationForm(forms.Form):
             self.add_error('captain_name', "Вкажіть ім'я контактної особи (капітана).")
         if not cleaned_data['captain_email']:
             self.add_error('captain_email', 'Вкажіть електронну пошту контактної особи (капітана).')
+        try:
+            cleaned_data['school'] = validate_school_name(cleaned_data.get('school'))
+        except ValidationError as exc:
+            self.add_error('school', exc)
         if not cleaned_data['preferred_contact_method']:
             self.add_error('preferred_contact_method', "Оберіть зручний спосіб зв'язку.")
         if not cleaned_data['preferred_contact_value']:

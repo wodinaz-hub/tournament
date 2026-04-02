@@ -469,6 +469,44 @@ class TournamentPlatformViewTests(TestCase):
         self.assertContains(response, "Вкажіть контакт для зв")
         self.assertFalse(Team.objects.filter(name="Participant Team", captain_user=self.participant_user).exists())
 
+    def test_participant_cannot_create_team_without_school(self):
+        self.client.force_login(self.participant_user)
+
+        response = self.client.post(
+            reverse("create_team"),
+            {
+                "name": "Participant Team",
+                "captain_name": "Member Captain",
+                "captain_email": "member@example.com",
+                "school": "",
+                "preferred_contact_method": "telegram",
+                "preferred_contact_value": "@team",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Вкажіть, будь ласка, свій навчальний заклад.")
+        self.assertFalse(Team.objects.filter(name="Participant Team", captain_user=self.participant_user).exists())
+
+    def test_participant_cannot_create_team_with_invalid_school(self):
+        self.client.force_login(self.participant_user)
+
+        response = self.client.post(
+            reverse("create_team"),
+            {
+                "name": "Participant Team",
+                "captain_name": "Member Captain",
+                "captain_email": "member@example.com",
+                "school": "test",
+                "preferred_contact_method": "telegram",
+                "preferred_contact_value": "@team",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Такого навчального закладу не знайдено, будь ласка, напишіть правильно.")
+        self.assertFalse(Team.objects.filter(name="Participant Team", captain_user=self.participant_user).exists())
+
     def test_participant_can_submit_registration_from_public_tournament_page(self):
         tournament = self.create_tournament()
         self.client.force_login(self.participant_user)
@@ -479,7 +517,7 @@ class TournamentPlatformViewTests(TestCase):
                 "team_name": "Open Team",
                 "captain_name": "Member Captain",
                 "captain_email": self.participant_user.email,
-                "school": "Ліцей",
+                "school": "Ліцей №1",
                 "preferred_contact_method": "discord",
                 "preferred_contact_value": "open-team-discord",
             },
@@ -489,7 +527,7 @@ class TournamentPlatformViewTests(TestCase):
         team = Team.objects.get(captain_user=self.participant_user, name="Open Team")
         registration = TournamentRegistration.objects.get(tournament=tournament, team=team)
         self.assertEqual(registration.status, TournamentRegistration.Status.PENDING)
-        self.assertEqual(team.school, "Ліцей")
+        self.assertEqual(team.school, "Ліцей №1")
         self.assertEqual(team.preferred_contact_method, "discord")
         self.assertEqual(team.preferred_contact_value, "open-team-discord")
         self.assertEqual(team.discord, "open-team-discord")
@@ -508,7 +546,7 @@ class TournamentPlatformViewTests(TestCase):
                 "team_name": "Open Team",
                 "captain_name": "Member Captain",
                 "captain_email": self.participant_user.email,
-                "school": "Ліцей",
+                "school": "Ліцей №1",
                 "preferred_contact_method": "",
                 "preferred_contact_value": "",
             },
@@ -517,6 +555,26 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Оберіть зручний спосіб")
         self.assertContains(response, "Вкажіть контакт для зв")
+        self.assertFalse(Team.objects.filter(captain_user=self.participant_user, name="Open Team").exists())
+
+    def test_public_tournament_registration_requires_valid_school(self):
+        tournament = self.create_tournament()
+        self.client.force_login(self.participant_user)
+
+        response = self.client.post(
+            reverse("public_tournament_detail", args=[tournament.id]),
+            {
+                "team_name": "Open Team",
+                "captain_name": "Member Captain",
+                "captain_email": self.participant_user.email,
+                "school": "test",
+                "preferred_contact_method": "discord",
+                "preferred_contact_value": "open-team-discord",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Такого навчального закладу не знайдено, будь ласка, напишіть правильно.")
         self.assertFalse(Team.objects.filter(captain_user=self.participant_user, name="Open Team").exists())
 
     def test_create_tournament_requires_at_least_one_allowed_contact_method(self):
@@ -1585,6 +1643,33 @@ class TournamentPlatformViewTests(TestCase):
 
         self.assertRedirects(response, reverse("team_detail", args=[team.id]))
         self.assertFalse(team.participants.filter(email="late@example.com").exists())
+
+    def test_team_detail_counts_captain_in_members_total(self):
+        team = Team.objects.create(
+            name="Count Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+
+        response = self.client.get(reverse("team_detail", args=[team.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["participants_count"], 1)
+        self.assertContains(response, '<div class="stat-value">1</div>', html=False)
+
+    def test_team_detail_back_button_leads_to_home(self):
+        team = Team.objects.create(
+            name="Back Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+
+        response = self.client.get(reverse("team_detail", args=[team.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{reverse("home")}"', html=False)
 
     def test_participant_cannot_leave_team_after_registration_end(self):
         self.client.force_login(self.participant_user)

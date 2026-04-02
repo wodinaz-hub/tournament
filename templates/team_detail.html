@@ -40,15 +40,18 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
 <div class="wrap">
     <div class="hero">
         <div>
-            <a class="back" href="{% url 'my_team' %}">Назад</a>
+            <a class="back" href="{% url 'home' %}">Назад</a>
             <h1>{{ team.name }}</h1>
             <div class="muted">
-                Контактна особа: {{ team.captain_name }}<br>
+                Контактна особа (капітан): {{ team.captain_name }}<br>
                 Електронна пошта: {{ team.captain_email }}<br>
                 Школа: {{ team.school|default:"-" }}<br>
-                Телеграм: {{ team.telegram|default:"-" }}<br>
-                Діскорд: {{ team.discord|default:"-" }}<br>
-                Вайбер: {{ team.viber|default:"-" }}
+                Зв'язок:
+                {% if team.effective_contact_value %}
+                    {{ team.effective_contact_label }} — {{ team.effective_contact_value }}
+                {% else %}
+                    -
+                {% endif %}
             </div>
 
             <div class="actions">
@@ -136,7 +139,7 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
         {% if can_manage_roster %}
             <form class="inline-form" method="post" action="{% url 'add_participant' team.id %}">
                 {% csrf_token %}
-                <div class="hint">Адміністратор або контактна особа може додавати учасників прямо тут, без переходу на окрему сторінку.</div>
+                <div class="hint">Адміністратор або контактна особа (капітан) може додавати учасників прямо тут, без переходу на окрему сторінку.</div>
                 <div class="inline-form-grid">
                     <div>
                         <label for="{{ participant_form.full_name.id_for_label }}">Ім'я</label>
@@ -162,7 +165,7 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
                 <div class="muted">{{ participant.email }}</div>
             </div>
         {% empty %}
-            <div class="muted">У команди поки немає учасників.</div>
+            <div class="muted">У команди поки немає інших учасників, окрім контактної особи (капітана).</div>
         {% endfor %}
     </div>
 

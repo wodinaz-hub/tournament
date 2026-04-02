@@ -2025,7 +2025,7 @@ def team_detail(request, team_id):
     quick_overview = build_team_quick_overview(team)
     return render(request, 'team_detail.html', {
         'team': team,
-        'participants_count': team.participants.count(),
+        'participants_count': team.members_count,
         'submissions': submissions,
         'quick_overview': quick_overview,
         'participant_form': ParticipantForm(),

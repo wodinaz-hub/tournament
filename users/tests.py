@@ -2360,6 +2360,7 @@ class TournamentPlatformViewTests(TestCase):
             {
                 "name": "",
                 "description": "",
+                "allowed_contact_methods": ["telegram"],
                 "start_date": "",
                 "end_date": "",
                 "registration_start": "",
@@ -2385,6 +2386,7 @@ class TournamentPlatformViewTests(TestCase):
                 "description": "",
                 "registration_form_description": "",
                 "registration_fields_definition": "participants|Учасники|participants|required\nschool|Школа|text|optional",
+                "allowed_contact_methods": ["telegram"],
                 "start_date": "",
                 "end_date": "",
                 "registration_start": "",

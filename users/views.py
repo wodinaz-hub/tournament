@@ -83,7 +83,9 @@ from .policies import (
     is_super_admin,
 )
 from .selectors import (
+    build_admin_dashboard_data,
     build_notification_nav_context,
+    build_public_tournament_rows,
     build_public_announcements,
     build_team_quick_overview,
     build_user_certificates_queryset,
@@ -332,70 +334,6 @@ def user_has_registration_access(user, registration):
     )
 
 
-def build_admin_dashboard_context(current_user, admin_create_user_form=None):
-    all_users = CustomUser.objects.order_by('role', 'username')
-    pending_users = CustomUser.objects.filter(is_approved=False).exclude(role='participant')
-    approved_users = CustomUser.objects.filter(is_approved=True)
-    tournaments = Tournament.objects.prefetch_related('tasks').all()
-    active_tournaments = [tournament for tournament in tournaments if not tournament.is_finished]
-    inactive_tournaments = [tournament for tournament in tournaments if tournament.is_finished]
-    teams = Team.objects.select_related('captain_user').prefetch_related('registrations__tournament')
-    submissions = Submission.objects.select_related('team', 'task', 'task__tournament').all()
-    jury_assignments = JuryAssignment.objects.select_related('jury_user', 'submission').all()
-    evaluations = Evaluation.objects.select_related('assignment').all()
-    registrations = TournamentRegistration.objects.select_related(
-        'tournament',
-        'team',
-        'registered_by',
-    ).prefetch_related('members').all()
-    for registration in registrations:
-        fields_by_key = {
-            field['key']: field.get('label', field['key'])
-            for field in registration.tournament.registration_fields_config
-        }
-        members_by_key = {
-            field['key']
-            for field in registration.tournament.registration_fields_config
-            if field.get('type') == 'participants'
-        }
-        registration.display_form_answers = [
-            {
-                'label': fields_by_key.get(key, key),
-                'value': (
-                    ', '.join(
-                        f"{member.full_name} ({member.email})"
-                        for member in registration.members.all()
-                    )
-                    if key in members_by_key
-                    else value
-                ),
-            }
-            for key, value in registration.form_answers.items()
-        ]
-
-    return {
-        'all_users': all_users,
-        'admin_create_user_form': admin_create_user_form or AdminCreateUserForm(
-            available_roles=get_available_admin_roles(current_user),
-        ),
-        'role_choices': [
-            choice for choice in CustomUser.ROLE_CHOICES
-            if choice[0] in get_available_admin_roles(current_user)
-        ],
-        'now': timezone.now(),
-        'pending_users': pending_users,
-        'approved_users': approved_users,
-        'tournaments': tournaments,
-        'active_tournaments': active_tournaments,
-        'inactive_tournaments': inactive_tournaments,
-        'teams': teams,
-        'submissions': submissions,
-        'jury_assignments': jury_assignments,
-        'evaluations': evaluations,
-        'registrations': registrations,
-    }
-
-
 def build_admin_nav_items():
     return [
         {'url': reverse('admin_users'), 'label': 'Користувачі'},
@@ -414,7 +352,7 @@ def render_admin_section(request, section, action=None, admin_create_user_form=N
         return redirect('redirect_by_role')
     if action is None:
         action = request.GET.get('action')
-    context = build_admin_dashboard_context(request.user)
+    context = build_admin_dashboard_data()
     context.update({
         'current_section': section,
         'admin_nav_items': build_admin_nav_items(),
@@ -422,33 +360,14 @@ def render_admin_section(request, section, action=None, admin_create_user_form=N
         'admin_create_user_form': admin_create_user_form or AdminCreateUserForm(
             available_roles=get_available_admin_roles(request.user),
         ),
+        'role_choices': [
+            choice for choice in CustomUser.ROLE_CHOICES
+            if choice[0] in get_available_admin_roles(request.user)
+        ],
+        'now': timezone.now(),
         'tournament_form': tournament_form or TournamentForm(),
     })
     return render(request, 'admin_section.html', context)
-
-def build_public_tournament_rows():
-    tournaments = list(
-        Tournament.objects.filter(is_draft=False).prefetch_related('tasks').select_related('created_by').order_by(
-            'registration_start',
-            'start_date',
-            'name',
-        )
-    )
-    rows = []
-    for tournament in tournaments:
-        rows.append({
-            'tournament': tournament,
-            'approved_count': TournamentRegistration.objects.filter(
-                tournament=tournament,
-                status=TournamentRegistration.Status.APPROVED,
-            ).count(),
-            'pending_count': TournamentRegistration.objects.filter(
-                tournament=tournament,
-                status=TournamentRegistration.Status.PENDING,
-            ).count(),
-            'leaderboard_preview': build_tournament_leaderboard(tournament)[:3] if tournament.evaluation_results_ready else [],
-        })
-    return rows
 
 
 def issue_certificates_for_tournament(*, tournament, issued_by, certificate_type, registrations):
@@ -472,7 +391,7 @@ def issue_certificates_for_tournament(*, tournament, issued_by, certificate_type
 
 
 def home(request):
-    tournament_rows = build_public_tournament_rows()
+    tournament_rows = build_public_tournament_rows(leaderboard_builder=build_tournament_leaderboard)
     announcements = build_public_announcements()
     notification_context = build_notification_nav_context(request.user)
     home_team, home_team_quick_overview = get_primary_team_with_quick_overview(request.user)

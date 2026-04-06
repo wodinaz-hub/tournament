@@ -1,11 +1,13 @@
 from datetime import timedelta
 
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from tournament.models import (
     Announcement,
     Certificate,
+    Evaluation,
+    JuryAssignment,
     Submission,
     Task,
     Team,
@@ -231,6 +233,79 @@ def build_team_quick_overview(team):
         "latest_submission": latest_submission,
         "tasks_total": len(tasks),
         "submitted_total": len(submissions),
+    }
+
+
+def build_public_tournament_rows(*, leaderboard_builder):
+    tournaments = list(
+        Tournament.objects.filter(is_draft=False)
+        .prefetch_related("tasks")
+        .select_related("created_by")
+        .annotate(
+            approved_count=Count(
+                "registrations",
+                filter=Q(registrations__status=TournamentRegistration.Status.APPROVED),
+            ),
+            pending_count=Count(
+                "registrations",
+                filter=Q(registrations__status=TournamentRegistration.Status.PENDING),
+            ),
+        )
+        .order_by("registration_start", "start_date", "name")
+    )
+    return [
+        {
+            "tournament": tournament,
+            "approved_count": tournament.approved_count,
+            "pending_count": tournament.pending_count,
+            "leaderboard_preview": leaderboard_builder(tournament)[:3] if tournament.evaluation_results_ready else [],
+        }
+        for tournament in tournaments
+    ]
+
+
+def build_admin_dashboard_data():
+    tournaments = list(Tournament.objects.prefetch_related("tasks").all())
+    registrations = (
+        TournamentRegistration.objects.select_related("tournament", "team", "registered_by")
+        .prefetch_related("members")
+        .all()
+    )
+
+    for registration in registrations:
+        fields_by_key = {
+            field["key"]: field.get("label", field["key"])
+            for field in registration.tournament.registration_fields_config
+        }
+        members_by_key = {
+            field["key"]
+            for field in registration.tournament.registration_fields_config
+            if field.get("type") == "participants"
+        }
+        registration.display_form_answers = [
+            {
+                "label": fields_by_key.get(key, key),
+                "value": (
+                    ", ".join(f"{member.full_name} ({member.email})" for member in registration.members.all())
+                    if key in members_by_key
+                    else value
+                ),
+            }
+            for key, value in registration.form_answers.items()
+        ]
+
+    return {
+        "all_users": CustomUser.objects.order_by("role", "username"),
+        "pending_users": CustomUser.objects.filter(is_approved=False).exclude(role="participant"),
+        "approved_users": CustomUser.objects.filter(is_approved=True),
+        "tournaments": tournaments,
+        "active_tournaments": [tournament for tournament in tournaments if not tournament.is_finished],
+        "inactive_tournaments": [tournament for tournament in tournaments if tournament.is_finished],
+        "teams": Team.objects.select_related("captain_user").prefetch_related("registrations__tournament"),
+        "submissions": Submission.objects.select_related("team", "task", "task__tournament").all(),
+        "jury_assignments": JuryAssignment.objects.select_related("jury_user", "submission").all(),
+        "evaluations": Evaluation.objects.select_related("assignment").all(),
+        "registrations": registrations,
     }
 
 

@@ -5,28 +5,22 @@ import logging
 from datetime import timedelta
 from statistics import mean
 
-import json
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 from PIL import Image, ImageDraw, ImageFont
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.template.loader import render_to_string
 from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.encoding import force_bytes, force_str
+from django.utils.encoding import force_str
 from django.utils import timezone
 from django.utils.http import (
-    url_has_allowed_host_and_scheme,
     urlsafe_base64_decode,
-    urlsafe_base64_encode,
 )
 
 from tournament.forms import (
@@ -57,73 +51,49 @@ from tournament.models import (
 from tournament.services import RegistrationService
 
 from .forms import AdminCreateUserForm, LoginForm, RegisterForm
-from .models import CustomUser, LoginThrottle
+from .models import CustomUser
+from .platform_services import (
+    LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY,
+    LOGIN_THROTTLE_IP_SESSION_KEY,
+    clear_login_throttle,
+    email_delivery_ready,
+    get_client_ip,
+    get_login_throttle,
+    normalize_login_identifier,
+    register_failed_login,
+    send_team_invitation_email,
+    send_verification_email,
+)
+from .policies import (
+    can_create_admins,
+    can_export_tournament_results,
+    can_manage_registration_instance,
+    can_manage_tournament_instance,
+    can_manage_tournaments,
+    can_manage_users,
+    can_review_registrations,
+    can_view_curated_tournament,
+    get_available_admin_roles,
+    get_dashboard_url_for_user,
+    get_post_redirect,
+    get_safe_redirect,
+    is_admin_user,
+    is_organizer_user,
+    is_participant_user,
+    is_super_admin,
+)
+from .selectors import (
+    build_notification_nav_context,
+    build_public_announcements,
+    build_team_quick_overview,
+    build_user_certificates_queryset,
+    build_user_message_items,
+    collect_registration_recipients,
+    get_primary_team_with_quick_overview,
+)
 
 logger = logging.getLogger(__name__)
 
-LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY = 'login_throttle_identifier'
-LOGIN_THROTTLE_IP_SESSION_KEY = 'login_throttle_ip'
-
-
-def get_client_ip(request):
-    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    if forwarded_for:
-        return forwarded_for.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR', '') or 'unknown'
-
-
-def normalize_login_identifier(value):
-    return (value or '').strip().lower()
-
-
-def get_login_throttle(identifier, ip_address):
-    if not identifier:
-        return None
-    return LoginThrottle.objects.filter(
-        identifier=identifier,
-        ip_address=ip_address,
-    ).first()
-
-
-def clear_login_throttle(request, identifier, ip_address):
-    if identifier:
-        LoginThrottle.objects.filter(
-            identifier=identifier,
-            ip_address=ip_address,
-        ).delete()
-    request.session.pop(LOGIN_THROTTLE_IDENTIFIER_SESSION_KEY, None)
-    request.session.pop(LOGIN_THROTTLE_IP_SESSION_KEY, None)
-
-
-def register_failed_login(identifier, ip_address):
-    if not identifier:
-        return None, None
-
-    now = timezone.now()
-    throttle, _created = LoginThrottle.objects.get_or_create(
-        identifier=identifier,
-        ip_address=ip_address,
-    )
-
-    if throttle.blocked_until and throttle.blocked_until > now:
-        return throttle, 0
-
-    max_attempts = getattr(settings, 'LOGIN_MAX_ATTEMPTS', 5)
-    block_minutes = getattr(settings, 'LOGIN_BLOCK_MINUTES', 15)
-    next_attempts = throttle.failed_attempts + 1
-
-    throttle.failed_attempts = next_attempts
-    throttle.last_failed_at = now
-
-    if next_attempts >= max_attempts:
-        throttle.blocked_until = now + timedelta(minutes=block_minutes)
-        throttle.failed_attempts = 0
-        throttle.save(update_fields=['failed_attempts', 'blocked_until', 'last_failed_at'])
-        return throttle, 0
-
-    throttle.blocked_until = None
-    throttle.save(update_fields=['failed_attempts', 'blocked_until', 'last_failed_at'])
-    return throttle, max_attempts - next_attempts
 
 
 def build_team_detail_context(request, team, participant_form=None):
@@ -151,193 +121,6 @@ def build_team_detail_context(request, team, participant_form=None):
         ),
         'roster_locked': roster_locked,
     }
-
-
-def get_primary_team_with_quick_overview(user):
-    if not getattr(user, 'is_authenticated', False):
-        return None, None
-
-    teams = Team.objects.filter(
-        Q(captain_user=user) | Q(participants__email=user.email)
-    ).select_related('captain_user').prefetch_related(
-        'participants',
-        'registrations__tournament',
-    ).distinct().order_by('name')
-
-    fallback_team = None
-    fallback_overview = None
-    for team in teams:
-        overview = build_team_quick_overview(team)
-        if fallback_team is None:
-            fallback_team = team
-            fallback_overview = overview
-        if overview is not None:
-            return team, overview
-
-    return fallback_team, fallback_overview
-
-
-def send_platform_email(to_email, subject, message):
-    provider = getattr(settings, 'EMAIL_DELIVERY_PROVIDER', '')
-
-    if provider == 'brevo':
-        payload = json.dumps(
-            {
-                'sender': {
-                    'email': settings.DEFAULT_FROM_EMAIL,
-                    'name': getattr(settings, 'EMAIL_SENDER_NAME', 'Tournament Platform'),
-                },
-                'to': [{'email': to_email}],
-                'subject': subject,
-                'textContent': message,
-            }
-        ).encode('utf-8')
-        request = Request(
-            'https://api.brevo.com/v3/smtp/email',
-            data=payload,
-            headers={
-                'accept': 'application/json',
-                'api-key': settings.BREVO_API_KEY,
-                'content-type': 'application/json',
-            },
-            method='POST',
-        )
-        with urlopen(request, timeout=settings.EMAIL_TIMEOUT):
-            pass
-        return
-
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[to_email],
-        fail_silently=False,
-    )
-
-
-def is_super_admin(user):
-    return user.is_superuser
-
-
-def is_admin_user(user):
-    return user.is_superuser or user.role == 'admin'
-
-
-def is_organizer_user(user):
-    return user.role == 'organizer'
-
-
-def is_participant_user(user):
-    return getattr(user, 'role', None) == 'participant'
-
-
-def can_manage_users(user):
-    return is_admin_user(user)
-
-
-def can_create_admins(user):
-    return is_admin_user(user)
-
-
-def can_manage_tournaments(user):
-    return is_admin_user(user) or is_organizer_user(user)
-
-
-def can_review_registrations(user):
-    return is_admin_user(user) or is_organizer_user(user)
-
-
-def send_verification_email(request, user):
-    verification_link = request.build_absolute_uri(
-        reverse(
-            'verify_email',
-            args=[
-                urlsafe_base64_encode(force_bytes(user.pk)),
-                default_token_generator.make_token(user),
-            ],
-        )
-    )
-    subject = 'Підтвердження електронної пошти'
-    message = render_to_string(
-        'emails/verify_email.txt',
-        {
-            'user': user,
-            'verification_link': verification_link,
-        },
-    )
-    send_platform_email(user.email, subject, message)
-
-
-def send_team_invitation_email(request, *, team, recipient_name, recipient_email):
-    registration_link = request.build_absolute_uri(reverse('register'))
-    subject = f'Запрошення до команди "{team.name}"'
-    greeting_name = recipient_name or recipient_email
-    message = (
-        f"Вітаємо, {greeting_name}!\n\n"
-        f'Вас намагаються додати до команди "{team.name}" на турнірній платформі.\n'
-        "Щоб приєднатися до команди та отримати доступ до турнірів, спочатку зареєструйтеся на сайті.\n\n"
-        f"Посилання для реєстрації: {registration_link}\n\n"
-        "Після реєстрації організатор або контактна особа команди зможе додати вас повторно."
-    )
-    send_platform_email(recipient_email, subject, message)
-
-
-def email_delivery_ready():
-    non_delivery_backends = {
-        'django.core.mail.backends.console.EmailBackend',
-        'django.core.mail.backends.dummy.EmailBackend',
-        'django.core.mail.backends.locmem.EmailBackend',
-        'django.core.mail.backends.filebased.EmailBackend',
-    }
-    provider = getattr(settings, 'EMAIL_DELIVERY_PROVIDER', '')
-    if provider == 'brevo':
-        return bool(getattr(settings, 'BREVO_API_KEY', '') and settings.DEFAULT_FROM_EMAIL)
-    return settings.DEBUG or settings.EMAIL_BACKEND not in non_delivery_backends
-
-
-def can_manage_tournament_instance(user, tournament):
-    return is_admin_user(user) or tournament.created_by_id == user.id
-
-
-def can_manage_registration_instance(user, registration):
-    return (
-        is_admin_user(user)
-        or registration.tournament.created_by_id == user.id
-    )
-
-
-def can_view_curated_tournament(user, tournament):
-    return (
-        is_admin_user(user)
-        or tournament.created_by_id == user.id
-    )
-
-
-def get_dashboard_url_for_user(user):
-    if is_admin_user(user):
-        return reverse('admin_users')
-    if is_organizer_user(user):
-        return reverse('organizer_dashboard')
-    if user.role == 'jury':
-        return reverse('jury_dashboard')
-    return reverse('home')
-
-
-def get_available_admin_roles(user):
-    roles = {'participant', 'jury', 'organizer'}
-    if can_create_admins(user):
-        roles.add('admin')
-    return roles
-
-
-def can_export_tournament_results(user, tournament):
-    return (
-        is_admin_user(user)
-        or tournament.created_by_id == user.id
-        or tournament.jury_users.filter(id=user.id).exists()
-    )
-
-
 def serialize_leaderboard_rows(leaderboard, my_team=None):
     my_team_id = my_team.id if my_team is not None else None
     return [
@@ -643,21 +426,6 @@ def render_admin_section(request, section, action=None, admin_create_user_form=N
     })
     return render(request, 'admin_section.html', context)
 
-
-def get_safe_redirect(request, candidate, fallback):
-    if candidate and url_has_allowed_host_and_scheme(
-        url=candidate,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure(),
-    ):
-        return candidate
-    return fallback
-
-
-def get_post_redirect(request, fallback):
-    return get_safe_redirect(request, request.POST.get('next'), fallback)
-
-
 def build_public_tournament_rows():
     tournaments = list(
         Tournament.objects.filter(is_draft=False).prefetch_related('tasks').select_related('created_by').order_by(
@@ -681,194 +449,6 @@ def build_public_tournament_rows():
             'leaderboard_preview': build_tournament_leaderboard(tournament)[:3] if tournament.evaluation_results_ready else [],
         })
     return rows
-
-
-def build_public_announcements():
-    return Announcement.objects.select_related('created_by', 'tournament').order_by('-created_at')[:5]
-
-
-def build_user_announcements_queryset(user):
-    return Announcement.objects.select_related('created_by', 'tournament').order_by('-created_at')
-
-
-def build_user_certificates_queryset(user):
-    return Certificate.objects.filter(
-        Q(recipient_user=user) | Q(recipient_email__iexact=user.email)
-    ).select_related('tournament', 'team', 'issued_by', 'recipient_user').distinct().order_by('-issued_at')
-
-
-def build_user_message_items(user):
-    items = []
-    seen_keys = set()
-    now = timezone.now()
-    kind_labels = {
-        'announcement': 'Оголошення',
-        'status': 'Статус',
-        'event': 'Подія',
-        'deadline': 'Дедлайн',
-        'finished': 'Завершено',
-        'system': 'Система',
-    }
-
-    def add_item(*, key, title, body, created_at, kind='system', tournament=None):
-        if created_at is None or created_at > now or key in seen_keys:
-            return
-        seen_keys.add(key)
-        items.append({
-            'key': key,
-            'title': title,
-            'body': body,
-            'created_at': created_at,
-            'kind': kind,
-            'kind_label': kind_labels.get(kind, 'Система'),
-            'tournament': tournament,
-        })
-
-    for announcement in build_user_announcements_queryset(user):
-        add_item(
-            key=f"announcement:{announcement.id}",
-            title=announcement.title,
-            body=announcement.message,
-            created_at=announcement.created_at,
-            kind='announcement',
-            tournament=announcement.tournament,
-        )
-
-    if getattr(user, 'is_authenticated', False):
-        public_tournaments = Tournament.objects.filter(is_draft=False).order_by('-registration_start', '-start_date')
-        for tournament in public_tournaments:
-            if tournament.registration_start is not None:
-                add_item(
-                    key=f"registration-open:{tournament.id}",
-                    title=f"Старт реєстрації: {tournament.name}",
-                    body="Реєстрацію на турнір відкрито. Можна подавати заявки команди.",
-                    created_at=tournament.registration_start,
-                    kind='event',
-                    tournament=tournament,
-                )
-
-    if getattr(user, 'is_authenticated', False) and is_participant_user(user):
-        registrations = TournamentRegistration.objects.select_related(
-            'tournament',
-            'team',
-        ).prefetch_related('members').filter(
-            Q(team__captain_user=user) | Q(members__user=user)
-        ).distinct()
-        for registration in registrations:
-            tournament = registration.tournament
-            add_item(
-                key=f"registration:{registration.id}:{registration.status}",
-                title=f"Статус заявки: {tournament.name}",
-                body=f"Заявка команди {registration.team.name} має статус «{registration.get_status_display()}».",
-                created_at=registration.created_at,
-                kind='status',
-                tournament=tournament,
-            )
-            if registration.status == TournamentRegistration.Status.APPROVED:
-                if tournament.start_date is not None:
-                    add_item(
-                        key=f"start:{tournament.id}",
-                        title=f"Старт завдань: {tournament.name}",
-                        body="Завдання турніру вже доступні. Перевірте умови, дедлайни та подайте сабміти вчасно.",
-                        created_at=tournament.start_date,
-                        kind='event',
-                        tournament=tournament,
-                    )
-                if tournament.end_date is not None:
-                    deadline_24h = tournament.end_date - timedelta(hours=24)
-                    if deadline_24h <= now:
-                        add_item(
-                            key=f"deadline:{tournament.id}",
-                            title=f"24 години до дедлайну: {tournament.name}",
-                            body="До завершення турніру залишилася доба. Перевірте, чи всі сабміти подані.",
-                            created_at=deadline_24h,
-                            kind='deadline',
-                            tournament=tournament,
-                        )
-                if tournament.is_finished:
-                    add_item(
-                        key=f"finished:{tournament.id}",
-                        title=f"Сабміти закрито: {tournament.name}",
-                        body="Турнір завершено. Прийом робіт закрито, офіційні відповіді вже доступні, а підсумковий рейтинг відкриється після завершення оцінювання.",
-                        created_at=tournament.end_date,
-                        kind='finished',
-                        tournament=tournament,
-                    )
-                    if tournament.evaluation_results_ready:
-                        add_item(
-                            key=f"evaluation-finished:{tournament.id}",
-                            title=f"Оцінювання завершено: {tournament.name}",
-                            body="Підсумковий лідерборд і результати команд уже доступні.",
-                            created_at=tournament.evaluation_finished_at or tournament.end_date,
-                            kind='system',
-                            tournament=tournament,
-                        )
-
-    items.sort(key=lambda item: item['created_at'], reverse=True)
-    return items
-
-
-def build_notification_nav_context(user):
-    if not getattr(user, 'is_authenticated', False):
-        return {
-            'has_unread_announcements': False,
-            'has_unread_certificates': False,
-            'unread_announcements_count': 0,
-            'unread_certificates_count': 0,
-        }
-
-    messages_seen_at = user.announcements_seen_at
-    certificates_seen_at = user.certificates_seen_at
-
-    message_items = build_user_message_items(user)
-    certificates_qs = build_user_certificates_queryset(user)
-
-    unread_messages_count = sum(
-        1 for item in message_items
-        if messages_seen_at is None or item['created_at'] > messages_seen_at
-    )
-
-    unread_certificates_qs = certificates_qs
-    if certificates_seen_at is not None:
-        unread_certificates_qs = unread_certificates_qs.filter(issued_at__gt=certificates_seen_at)
-
-    return {
-        'has_unread_announcements': unread_messages_count > 0,
-        'has_unread_certificates': unread_certificates_qs.exists(),
-        'unread_announcements_count': unread_messages_count,
-        'unread_certificates_count': unread_certificates_qs.count(),
-    }
-
-
-def collect_registration_recipients(registration):
-    recipients = []
-    seen_emails = set()
-
-    def add_recipient(*, user=None, name='', email=''):
-        normalized_email = (email or '').strip().lower()
-        if not normalized_email or normalized_email in seen_emails:
-            return
-        seen_emails.add(normalized_email)
-        recipients.append({
-            'user': user,
-            'name': (name or normalized_email).strip(),
-            'email': normalized_email,
-        })
-
-    add_recipient(
-        user=registration.team.captain_user,
-        name=registration.team.captain_name,
-        email=registration.team.captain_email,
-    )
-
-    for member in registration.members.all():
-        add_recipient(user=member.user, name=member.full_name, email=member.email)
-
-    for participant in registration.team.participants.all():
-        linked_user = CustomUser.objects.filter(email__iexact=participant.email).first()
-        add_recipient(user=linked_user, name=participant.full_name, email=participant.email)
-
-    return recipients
 
 
 def issue_certificates_for_tournament(*, tournament, issued_by, certificate_type, registrations):
@@ -995,32 +575,6 @@ def certificates_view(request):
         'certificates': certificates,
         **build_notification_nav_context(request.user),
     })
-
-
-def build_team_quick_overview(team):
-    active_registration = team.registrations.select_related('tournament').filter(
-        status=TournamentRegistration.Status.APPROVED,
-    ).order_by('tournament__start_date').first()
-    if active_registration is None:
-        return None
-
-    tournament = active_registration.tournament
-    tasks = list(Task.objects.filter(tournament=tournament, is_draft=False).order_by('title'))
-    submissions = list(
-        Submission.objects.filter(team=team, task__tournament=tournament).select_related('task').order_by('-submitted_at')
-    )
-    submission_by_task_id = {submission.task_id: submission for submission in submissions}
-    next_task = next((task for task in tasks if task.id not in submission_by_task_id), tasks[0] if tasks else None)
-    latest_submission = submissions[0] if submissions else None
-
-    return {
-        'tournament': tournament,
-        'registration': active_registration,
-        'next_task': next_task,
-        'latest_submission': latest_submission,
-        'tasks_total': len(tasks),
-        'submitted_total': len(submissions),
-    }
 
 
 def build_archive_rows_for_user(user):

@@ -322,7 +322,7 @@ class TournamentPlatformViewTests(TestCase):
         DEFAULT_FROM_EMAIL="verified@example.com",
         EMAIL_SENDER_NAME="Tournament Platform",
     )
-    @patch("users.views.urlopen")
+    @patch("users.platform_services.urlopen")
     def test_register_uses_brevo_api_when_configured(self, mock_urlopen):
         mock_urlopen.return_value.__enter__.return_value = None
         self.client.logout()

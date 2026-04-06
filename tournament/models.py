@@ -473,7 +473,7 @@ class Submission(models.Model):
     live_demo = models.URLField(
         null=True,
         blank=True,
-        verbose_name="Демо РїРѕСЃРёР»Р°РЅРЅСЏ",
+        verbose_name="Демо посилання",
     )
     description = models.TextField(
         null=True,

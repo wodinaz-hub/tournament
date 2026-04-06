@@ -48,7 +48,7 @@ from tournament.models import (
     Tournament,
     TournamentRegistration,
 )
-from tournament.services import RegistrationService
+from tournament.services import RegistrationService, TournamentLifecycleService
 
 from .forms import AdminCreateUserForm, LoginForm, RegisterForm
 from .models import CustomUser
@@ -1127,21 +1127,7 @@ def start_tournament_now(request, tournament_id):
     if not can_manage_tournament_instance(request.user, tournament):
         return redirect('redirect_by_role')
 
-    now = timezone.now()
-    tournament.is_draft = False
-    tournament.registration_start = tournament.registration_start or (now - timedelta(days=1))
-    if tournament.registration_end is None or tournament.registration_end > now:
-        tournament.registration_end = now
-    tournament.start_date = now
-    if tournament.end_date is None or tournament.end_date <= now:
-        tournament.end_date = now + timedelta(days=1)
-    tournament.save(update_fields=[
-        'is_draft',
-        'registration_start',
-        'registration_end',
-        'start_date',
-        'end_date',
-    ])
+    tournament = TournamentLifecycleService.start_now(tournament=tournament)
     finalize_tournament_evaluation_if_ready(tournament, finished_by=request.user)
     return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
 
@@ -1157,19 +1143,7 @@ def finish_tournament_now(request, tournament_id):
     if not can_manage_tournament_instance(request.user, tournament):
         return redirect('redirect_by_role')
 
-    now = timezone.now()
-    tournament.is_draft = False
-    tournament.registration_start = tournament.registration_start or (now - timedelta(days=1))
-    tournament.registration_end = now
-    tournament.start_date = tournament.start_date or (now - timedelta(hours=1))
-    tournament.end_date = now
-    tournament.save(update_fields=[
-        'is_draft',
-        'registration_start',
-        'registration_end',
-        'start_date',
-        'end_date',
-    ])
+    TournamentLifecycleService.finish_now(tournament=tournament)
     return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
 
 
@@ -1186,12 +1160,10 @@ def finish_evaluation_now(request, tournament_id):
     if not tournament.is_finished:
         return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
 
-    tournament.evaluation_finished_at = timezone.now()
-    tournament.evaluation_finished_by = request.user
-    tournament.save(update_fields=[
-        'evaluation_finished_at',
-        'evaluation_finished_by',
-    ])
+    TournamentLifecycleService.finish_evaluation(
+        tournament=tournament,
+        finished_by=request.user,
+    )
     return redirect(get_post_redirect(request, get_dashboard_url_for_user(request.user)))
 
 

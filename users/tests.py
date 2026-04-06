@@ -1241,10 +1241,11 @@ class TournamentPlatformViewTests(TestCase):
 
     def test_admin_can_export_results_csv(self):
         tournament = self.create_tournament(
-            start_date=timezone.now() - timedelta(hours=1),
-            end_date=timezone.now() + timedelta(hours=3),
+            start_date=timezone.now() - timedelta(hours=4),
+            end_date=timezone.now() - timedelta(hours=1),
             registration_end=timezone.now() - timedelta(hours=2),
         )
+        tournament.jury_users.add(self.jury_user)
         task = Task.objects.create(
             tournament=tournament,
             title="CSV task",

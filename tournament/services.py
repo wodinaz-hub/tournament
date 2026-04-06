@@ -1,8 +1,10 @@
+from datetime import timedelta
 from typing import Any, Dict, Iterable
 
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models, transaction
+from django.utils import timezone
 
 from users.models import CustomUser
 
@@ -218,3 +220,68 @@ class RegistrationService:
             ])
 
         return registration
+
+
+class TournamentLifecycleService:
+    @staticmethod
+    @transaction.atomic
+    def start_now(*, tournament: Tournament) -> Tournament:
+        locked_tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+        now = timezone.now()
+
+        locked_tournament.is_draft = False
+        locked_tournament.registration_start = locked_tournament.registration_start or (now - timedelta(days=1))
+        if locked_tournament.registration_end is None or locked_tournament.registration_end > now:
+            locked_tournament.registration_end = now
+        locked_tournament.start_date = now
+        if locked_tournament.end_date is None or locked_tournament.end_date <= now:
+            locked_tournament.end_date = now + timedelta(days=1)
+        locked_tournament.save(
+            update_fields=[
+                "is_draft",
+                "registration_start",
+                "registration_end",
+                "start_date",
+                "end_date",
+            ]
+        )
+        return locked_tournament
+
+    @staticmethod
+    @transaction.atomic
+    def finish_now(*, tournament: Tournament) -> Tournament:
+        locked_tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+        now = timezone.now()
+
+        locked_tournament.is_draft = False
+        locked_tournament.registration_start = locked_tournament.registration_start or (now - timedelta(days=1))
+        locked_tournament.registration_end = now
+        locked_tournament.start_date = locked_tournament.start_date or (now - timedelta(hours=1))
+        locked_tournament.end_date = now
+        locked_tournament.save(
+            update_fields=[
+                "is_draft",
+                "registration_start",
+                "registration_end",
+                "start_date",
+                "end_date",
+            ]
+        )
+        return locked_tournament
+
+    @staticmethod
+    @transaction.atomic
+    def finish_evaluation(*, tournament: Tournament, finished_by: CustomUser) -> Tournament:
+        locked_tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+        if not locked_tournament.is_finished:
+            raise ValidationError("Оцінювання можна завершити лише після завершення турніру.")
+
+        locked_tournament.evaluation_finished_at = timezone.now()
+        locked_tournament.evaluation_finished_by = finished_by
+        locked_tournament.save(
+            update_fields=[
+                "evaluation_finished_at",
+                "evaluation_finished_by",
+            ]
+        )
+        return locked_tournament

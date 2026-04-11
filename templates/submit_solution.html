@@ -1,24 +1,25 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-<meta charset="UTF-8">
-<title>{{ task.title }}</title>
-<style>
-body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;padding:30px 20px;color:#172033;}
-.wrap{max-width:760px;margin:0 auto;}
-.card{background:white;padding:24px;border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.06);}
-label{display:block;margin-bottom:6px;font-weight:700;}
-.form-input,input,textarea{width:100%;padding:12px 14px;margin-bottom:14px;border:1px solid #d0d7e2;border-radius:10px;box-sizing:border-box;font:inherit;}
-.checkbox-row{display:flex;gap:10px;align-items:center;margin:8px 0 16px;}
-.checkbox-row input{width:auto;margin:0;}
-.button,.back{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:10px 15px;border-radius:10px;text-decoration:none;font-weight:700;}
-.button{border:none;background:#2563eb;color:white;cursor:pointer;}
-.back{color:#2563eb;background:#eef4ff;}
-.field-errors{color:#b00020;font-size:14px;margin:-8px 0 10px;}
-.meta{color:#64748b;line-height:1.7;margin-bottom:16px;}
-.notice{background:#eef4ff;border:1px solid #dbeafe;color:#1e3a8a;padding:14px;border-radius:12px;margin-bottom:18px;}
-.error-box{background:#fee2e2;color:#991b1b;padding:12px 14px;border-radius:12px;margin-bottom:16px;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ task.title }}</title>
+    <style>
+        body { margin:0; font-family:Arial,sans-serif; background:#f4f6fb; padding:30px 20px; color:#172033; }
+        .wrap { max-width:760px; margin:0 auto; }
+        .card { background:white; padding:24px; border-radius:16px; box-shadow:0 10px 24px rgba(0,0,0,.06); }
+        label { display:block; margin-bottom:6px; font-weight:700; }
+        .form-input, input, textarea, select { width:100%; padding:12px 14px; margin-bottom:14px; border:1px solid #d0d7e2; border-radius:10px; box-sizing:border-box; font:inherit; }
+        .checkbox-row { display:flex; gap:10px; align-items:center; margin:8px 0 16px; }
+        .checkbox-row input { width:auto; margin:0; }
+        .button, .back { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:10px 15px; border-radius:10px; text-decoration:none; font-weight:700; }
+        .button { border:none; background:#2563eb; color:white; cursor:pointer; }
+        .back { color:#2563eb; background:#eef4ff; }
+        .field-errors { color:#b00020; font-size:14px; margin:-8px 0 10px; }
+        .meta { color:#64748b; line-height:1.7; margin-bottom:16px; }
+        .notice { background:#eef4ff; border:1px solid #dbeafe; color:#1e3a8a; padding:14px; border-radius:12px; margin-bottom:18px; }
+        .error-box { background:#fee2e2; color:#991b1b; padding:12px 14px; border-radius:12px; margin-bottom:16px; }
+    </style>
 </head>
 <body>
 <div class="wrap">
@@ -32,7 +33,7 @@ label{display:block;margin-bottom:6px;font-weight:700;}
 </p>
 
 <div class="notice">
-Ви можете редагувати це рішення до дедлайну саме цього завдання. Після завершення дедлайну подачу буде закрито.
+Ви можете редагувати цю відповідь до дедлайну саме цього завдання. Після завершення дедлайну подачу буде закрито.
 </div>
 
 {% if form.non_field_errors %}
@@ -42,28 +43,21 @@ label{display:block;margin-bottom:6px;font-weight:700;}
 <form method="post">
 {% csrf_token %}
 
-<label for="{{ form.github_link.id_for_label }}">Посилання на GitHub</label>
-{{ form.github_link }}
-{% if form.github_link.errors %}<div class="field-errors">{{ form.github_link.errors }}</div>{% endif %}
+{% for field in form.visible_fields %}
+    {% if field.name == 'is_final' %}
+        <div class="checkbox-row">
+            {{ field }}
+            <label for="{{ field.id_for_label }}" style="margin:0;">{{ field.label }}</label>
+        </div>
+        {% if field.errors %}<div class="field-errors">{{ field.errors }}</div>{% endif %}
+    {% else %}
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div class="field-errors">{{ field.errors }}</div>{% endif %}
+    {% endif %}
+{% endfor %}
 
-<label for="{{ form.video_link.id_for_label }}">Посилання на відео</label>
-{{ form.video_link }}
-{% if form.video_link.errors %}<div class="field-errors">{{ form.video_link.errors }}</div>{% endif %}
-
-<label for="{{ form.live_demo.id_for_label }}">Посилання на live demo</label>
-{{ form.live_demo }}
-{% if form.live_demo.errors %}<div class="field-errors">{{ form.live_demo.errors }}</div>{% endif %}
-
-<label for="{{ form.description.id_for_label }}">Короткий опис рішення</label>
-{{ form.description }}
-{% if form.description.errors %}<div class="field-errors">{{ form.description.errors }}</div>{% endif %}
-
-<div class="checkbox-row">
-{{ form.is_final }}
-<label for="{{ form.is_final.id_for_label }}" style="margin:0;">Позначити як фінальну версію</label>
-</div>
-
-<button class="button" type="submit">{% if submission %}Оновити рішення{% else %}Надіслати рішення{% endif %}</button>
+<button class="button" type="submit">{% if submission %}Оновити відповідь{% else %}Надіслати відповідь{% endif %}</button>
 <a class="back" href="{% url 'tournament_tasks' task.tournament.id %}">Назад</a>
 </form>
 </div>

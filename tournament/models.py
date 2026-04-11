@@ -3,6 +3,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
+from .submission_formats import build_submission_response_items
+
 
 class Tournament(models.Model):
     DEFAULT_CONTACT_METHODS = ["telegram", "discord", "viber"]
@@ -405,6 +407,11 @@ class Task(models.Model):
         blank=True,
         verbose_name="Офіційна відповідь / розбір",
     )
+    submission_fields_config = models.JSONField(
+        blank=True,
+        default=list,
+        verbose_name="Формат відповіді",
+    )
     is_draft = models.BooleanField(default=True, verbose_name="Чернетка")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -468,8 +475,8 @@ class Submission(models.Model):
         related_name="submissions",
         verbose_name="Завдання",
     )
-    github_link = models.URLField(verbose_name="GitHub посилання")
-    video_link = models.URLField(verbose_name="Відео посилання")
+    github_link = models.URLField(blank=True, verbose_name="GitHub посилання")
+    video_link = models.URLField(blank=True, verbose_name="Відео посилання")
     live_demo = models.URLField(
         null=True,
         blank=True,
@@ -482,6 +489,11 @@ class Submission(models.Model):
     )
     submitted_at = models.DateTimeField(auto_now_add=True, verbose_name="Час подання")
     is_final = models.BooleanField(default=False, verbose_name="Фінальна версія")
+    form_answers = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="Додаткові відповіді",
+    )
 
     class Meta:
         ordering = ["-submitted_at"]
@@ -496,6 +508,10 @@ class Submission(models.Model):
 
     def __str__(self):
         return f"{self.team.name} - {self.task.title}"
+
+    @property
+    def response_items(self):
+        return build_submission_response_items(self)
 
 
 class JuryAssignment(models.Model):

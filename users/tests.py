@@ -2187,6 +2187,51 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(submission.description, "My final solution")
         self.assertTrue(submission.is_final)
 
+    def test_submit_solution_saves_custom_answer_fields_from_task_format(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(hours=1),
+            end_date=timezone.now() + timedelta(days=1),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        team = Team.objects.create(
+            name="Language Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Essay",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            submission_fields_config=[
+                {"key": "essay_text", "label": "Текст відповіді", "type": "textarea", "required": True, "builtin": False},
+                {"key": "description", "label": "Коментар", "type": "textarea", "required": False, "builtin": True},
+            ],
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+
+        response = self.client.post(
+            reverse("submit_solution", args=[task.id]),
+            {
+                "essay_text": "Моя розгорнута відповідь",
+                "description": "Додатковий коментар",
+            },
+        )
+
+        self.assertRedirects(response, reverse("team_detail", args=[team.id]))
+        submission = Submission.objects.get(team=team, task=task)
+        self.assertEqual(submission.form_answers["essay_text"], "Моя розгорнута відповідь")
+        self.assertEqual(submission.description, "Додатковий коментар")
+
     def test_submit_solution_is_blocked_after_task_deadline(self):
         now = timezone.now()
         tournament = self.create_tournament(
@@ -2334,6 +2379,29 @@ class TournamentPlatformViewTests(TestCase):
         task = Task.objects.get(title="Context task")
         self.assertEqual(task.start_at.replace(second=0, microsecond=0), tournament.start_date.replace(second=0, microsecond=0))
         self.assertEqual(task.deadline.replace(second=0, microsecond=0), tournament.end_date.replace(second=0, microsecond=0))
+
+    def test_create_task_rejects_empty_submission_format_definition(self):
+        tournament = self.create_tournament()
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("create_tournament_task", args=[tournament.id]),
+            {
+                "tournament": tournament.id,
+                "title": "Context task",
+                "description": "desc",
+                "requirements": "req",
+                "must_have": "must",
+                "submission_preset": "generic",
+                "submission_fields_definition": "",
+                "start_at": timezone.localtime(tournament.start_date).strftime("%Y-%m-%dT%H:%M"),
+                "deadline": timezone.localtime(tournament.end_date).strftime("%Y-%m-%dT%H:%M"),
+                "official_solution": "solution",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Потрібно додати хоча б одне поле формату відповіді.")
 
     def test_edit_task_page_back_link_points_to_edit_tournament(self):
         tournament = self.create_tournament()

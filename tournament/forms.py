@@ -19,6 +19,16 @@ from .models import (
     TournamentScheduleItem,
     TournamentRegistration,
 )
+from .submission_formats import (
+    BUILTIN_SUBMISSION_FIELDS,
+    CUSTOM_FIELD_TYPE_CHOICES,
+    build_submission_fields_definition_for_preset,
+    infer_submission_preset,
+    parse_submission_fields_definition,
+    resolve_task_submission_fields_config,
+    serialize_submission_fields_definition,
+    submission_preset_choices,
+)
 from .validators import validate_school_name
 from users.models import CustomUser
 
@@ -728,6 +738,23 @@ class TournamentRegistrationForm(forms.Form):
 
 
 class TaskForm(forms.ModelForm):
+    submission_preset = forms.ChoiceField(
+        required=False,
+        label='Шаблон формату відповіді',
+        choices=submission_preset_choices(),
+        widget=forms.Select(attrs={'class': 'form-input'}),
+    )
+    submission_fields_definition = forms.CharField(
+        required=False,
+        label='Формат відповіді',
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-input',
+                'rows': 6,
+                'placeholder': 'key|Назва поля|тип|required/optional',
+            }
+        ),
+    )
     start_at = forms.DateTimeField(
         required=False,
         input_formats=['%Y-%m-%dT%H:%M'],
@@ -758,6 +785,8 @@ class TaskForm(forms.ModelForm):
             'start_at',
             'deadline',
             'official_solution',
+            'submission_preset',
+            'submission_fields_definition',
             'is_draft',
         ]
         widgets = {
@@ -781,8 +810,14 @@ class TaskForm(forms.ModelForm):
             'start_at',
             'deadline',
             'official_solution',
+            'submission_fields_definition',
         ]:
             self.fields[field_name].required = False
+
+        initial_config = resolve_task_submission_fields_config(self.instance if getattr(self.instance, 'pk', None) else None)
+        initial_preset = infer_submission_preset(initial_config)
+        self.fields['submission_preset'].initial = initial_preset
+        self.fields['submission_fields_definition'].initial = serialize_submission_fields_definition(initial_config)
 
         if tournament is not None:
             self.fields['tournament'].initial = tournament
@@ -794,6 +829,21 @@ class TaskForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        preset_key = cleaned_data.get('submission_preset') or 'informatics'
+        raw_definition = (cleaned_data.get('submission_fields_definition') or '').strip()
+        raw_field_was_submitted = 'submission_fields_definition' in self.data
+        if not raw_definition and not raw_field_was_submitted:
+            raw_definition = serialize_submission_fields_definition(
+                build_submission_fields_definition_for_preset(preset_key)
+            )
+            cleaned_data['submission_fields_definition'] = raw_definition
+        try:
+            submission_fields_config = parse_submission_fields_definition(raw_definition)
+        except ValidationError as exc:
+            self.add_error('submission_fields_definition', exc)
+            submission_fields_config = []
+        cleaned_data['submission_fields_config'] = submission_fields_config
+
         if cleaned_data.get('is_draft'):
             return cleaned_data
 
@@ -804,6 +854,7 @@ class TaskForm(forms.ModelForm):
             'must_have': (cleaned_data.get('must_have') or '').strip(),
             'start_at': cleaned_data.get('start_at'),
             'deadline': cleaned_data.get('deadline'),
+            'submission_fields_definition': submission_fields_config,
         }
         for field_name, value in required_fields.items():
             if not value:
@@ -828,8 +879,17 @@ class TaskForm(forms.ModelForm):
 
         return cleaned_data
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.submission_fields_config = self.cleaned_data.get('submission_fields_config', [])
+        if commit:
+            instance.save()
+        return instance
+
 
 class SubmissionForm(forms.ModelForm):
+    BUILTIN_FIELD_ORDER = ['github_link', 'video_link', 'live_demo', 'description', 'is_final']
+
     class Meta:
         model = Submission
         fields = [
@@ -846,6 +906,86 @@ class SubmissionForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 5}),
             'is_final': forms.CheckboxInput(),
         }
+
+    def __init__(self, *args, **kwargs):
+        self.task = kwargs.pop('task', None)
+        super().__init__(*args, **kwargs)
+        if self.task is None and getattr(self.instance, 'pk', None):
+            self.task = self.instance.task
+
+        self.answer_config = resolve_task_submission_fields_config(self.task)
+        self.dynamic_answer_keys = []
+        self.fields['github_link'].required = False
+        self.fields['video_link'].required = False
+        self.fields['live_demo'].required = False
+        self.fields['description'].required = False
+        self.fields['is_final'].required = False
+
+        configured_builtin_keys = {
+            item['key']
+            for item in self.answer_config
+            if item.get('builtin')
+        }
+
+        for field_name in list(self.fields.keys()):
+            if field_name in self.BUILTIN_FIELD_ORDER and field_name not in configured_builtin_keys:
+                self.fields.pop(field_name)
+
+        form_answers = getattr(self.instance, 'form_answers', {}) or {}
+        ordered_keys = []
+
+        for item in self.answer_config:
+            field_key = item['key']
+            ordered_keys.append(field_key)
+            if item.get('builtin'):
+                field = self.fields[field_key]
+                field.label = item['label']
+                field.required = item['required']
+                continue
+
+            field_class = CUSTOM_FIELD_TYPE_CHOICES[item['type']]
+            widget = None
+            if item['type'] == 'textarea':
+                widget = forms.Textarea(attrs={'class': 'form-input', 'rows': 5})
+            elif item['type'] == 'email':
+                widget = forms.EmailInput(attrs={'class': 'form-input'})
+            elif item['type'] == 'number':
+                widget = forms.NumberInput(attrs={'class': 'form-input'})
+            elif item['type'] == 'url':
+                widget = forms.URLInput(attrs={'class': 'form-input'})
+            else:
+                widget = forms.TextInput(attrs={'class': 'form-input'})
+
+            self.fields[field_key] = field_class(
+                required=item['required'],
+                label=item['label'],
+                widget=widget,
+                initial=form_answers.get(field_key),
+            )
+            self.dynamic_answer_keys.append(field_key)
+
+        self.order_fields(ordered_keys)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_answers = {}
+        for item in self.answer_config:
+            if item.get('builtin'):
+                continue
+            value = cleaned_data.get(item['key'])
+            if value in (None, ''):
+                cleaned_answers[item['key']] = ''
+            else:
+                cleaned_answers[item['key']] = value
+        cleaned_data['form_answers'] = cleaned_answers
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.form_answers = self.cleaned_data.get('form_answers', {})
+        if commit:
+            instance.save()
+        return instance
 
 
 class EvaluationForm(forms.ModelForm):

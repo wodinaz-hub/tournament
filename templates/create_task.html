@@ -2,6 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if mode == 'edit' %}Редагувати завдання{% else %}Створити завдання{% endif %}</title>
     <style>
         * { box-sizing: border-box; }
@@ -13,22 +14,15 @@
             padding: 30px 20px;
             color: #172033;
         }
-        .wrap { max-width: 900px; margin: 0 auto; }
+        .wrap { max-width: 980px; margin: 0 auto; }
         .card {
             background: white;
             padding: 28px;
             border-radius: 18px;
             box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
         }
-        h1 {
-            margin: 0 0 10px;
-            font-size: 32px;
-        }
-        .subtitle,
-        .hint {
-            color: #516074;
-            line-height: 1.7;
-        }
+        h1 { margin: 0 0 10px; font-size: 32px; }
+        .subtitle, .hint, .field-help { color: #516074; line-height: 1.7; }
         .subtitle { margin-bottom: 12px; }
         .hint {
             margin-bottom: 22px;
@@ -37,21 +31,23 @@
             background: #eef4ff;
             border: 1px solid #d8e5ff;
         }
+        .section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e5edf8;
+        }
+        .section h2 {
+            margin: 0 0 10px;
+            font-size: 22px;
+        }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px;
         }
         .span2 { grid-column: 1 / -1; }
-        label {
-            display: block;
-            margin-bottom: 7px;
-            font-weight: 700;
-        }
-        input,
-        textarea,
-        select,
-        .form-input {
+        label { display: block; margin-bottom: 7px; font-weight: 700; }
+        input, textarea, select, .form-input {
             width: 100%;
             padding: 12px 14px;
             border: 1px solid #d0d7e2;
@@ -61,11 +57,7 @@
         }
         textarea { min-height: 120px; resize: vertical; }
         .field { margin-bottom: 4px; }
-        .field-errors {
-            color: #b00020;
-            font-size: 14px;
-            margin-top: 6px;
-        }
+        .field-errors { color: #b00020; font-size: 14px; margin-top: 6px; }
         .error-box {
             background: #fee2e2;
             color: #991b1b;
@@ -79,18 +71,14 @@
             gap: 10px;
             margin: 18px 0 22px;
         }
-        .checkbox-row input {
-            width: auto;
-            margin: 0;
-        }
+        .checkbox-row input { width: auto; margin: 0; }
         .actions {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
-            margin-top: 6px;
+            margin-top: 10px;
         }
-        .btn,
-        .back {
+        .btn, .back {
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -101,19 +89,9 @@
             font-weight: 700;
             font-size: 15px;
         }
-        .btn {
-            border: none;
-            background: #2563eb;
-            color: #fff;
-            cursor: pointer;
-        }
-        .back {
-            background: #eef4ff;
-            color: #2563eb;
-        }
-        @media (max-width: 760px) {
-            .grid { grid-template-columns: 1fr; }
-        }
+        .btn { border: none; background: #2563eb; color: #fff; cursor: pointer; }
+        .back { background: #eef4ff; color: #2563eb; }
+        @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -130,8 +108,9 @@
             </div>
 
             <div class="hint">
-                Для опублікованого завдання потрібно вказати окремі дати старту та завершення прийому рішень.
-                Це дає можливість відкривати і закривати кожне завдання незалежно в межах одного турніру.
+                Для опублікованого завдання потрібно вказати окремі дати старту та завершення прийому відповідей.
+                Нижче також можна налаштувати, у якому саме форматі команда повинна подати свою відповідь:
+                використати готовий шаблон або змінити його під себе.
             </div>
 
             {% if form.non_field_errors %}
@@ -183,11 +162,37 @@
                     </div>
 
                     <div class="field span2">
-                        <label for="{{ form.must_have.id_for_label }}">Обов'язкові пункти</label>
+                        <label for="{{ form.must_have.id_for_label }}">Обов'язково має бути</label>
                         {{ form.must_have }}
                         {% if form.must_have.errors %}<div class="field-errors">{{ form.must_have.errors }}</div>{% endif %}
                     </div>
+                </div>
 
+                <div class="section">
+                    <h2>Формат відповіді</h2>
+                    <div class="field-help">
+                        Оберіть заготовку, наприклад для інформатики чи української мови, а потім за потреби відредагуйте поля нижче.
+                        Формат одного рядка: <strong>ключ|Назва поля|тип|required/optional</strong>.
+                        Має залишитися хоча б одне поле.
+                    </div>
+
+                    <div class="grid" style="margin-top:14px;">
+                        <div class="field span2">
+                            <label for="{{ form.submission_preset.id_for_label }}">Шаблон формату відповіді</label>
+                            {{ form.submission_preset }}
+                            {% if form.submission_preset.errors %}<div class="field-errors">{{ form.submission_preset.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="field span2">
+                            <label for="{{ form.submission_fields_definition.id_for_label }}">Поля відповіді</label>
+                            {{ form.submission_fields_definition }}
+                            {% if form.submission_fields_definition.errors %}<div class="field-errors">{{ form.submission_fields_definition.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Розбір після завершення</h2>
                     <div class="field span2">
                         <label for="{{ form.official_solution.id_for_label }}">Офіційна відповідь / розбір</label>
                         {{ form.official_solution }}
@@ -202,13 +207,46 @@
                 {% if form.is_draft.errors %}<div class="field-errors">{{ form.is_draft.errors }}</div>{% endif %}
 
                 <div class="actions">
-                    <button class="btn" type="submit">
-                        {% if mode == 'edit' %}Зберегти зміни{% else %}Створити завдання{% endif %}
-                    </button>
+                    <button class="btn" type="submit">{% if mode == 'edit' %}Зберегти зміни{% else %}Створити завдання{% endif %}</button>
                     <a class="back" href="{{ back_url|default:'/dashboard/tournaments/active/' }}">Назад</a>
                 </div>
             </form>
         </div>
     </div>
+
+    {{ task_submission_presets|json_script:"task-submission-presets" }}
+    <script>
+        (function () {
+            const presetSelect = document.getElementById("id_submission_preset");
+            const definitionField = document.getElementById("id_submission_fields_definition");
+            const presetsScript = document.getElementById("task-submission-presets");
+            if (!presetSelect || !definitionField || !presetsScript) {
+                return;
+            }
+
+            const presets = JSON.parse(presetsScript.textContent);
+            let lastAppliedPreset = presetSelect.value;
+
+            function applyPreset(presetKey, force) {
+                if (!presets[presetKey]) {
+                    return;
+                }
+
+                const currentValue = definitionField.value.trim();
+                const presetValue = presets[presetKey].trim();
+                const previousPresetValue = presets[lastAppliedPreset] ? presets[lastAppliedPreset].trim() : "";
+                const canReplace = force || !currentValue || currentValue === previousPresetValue;
+
+                if (canReplace) {
+                    definitionField.value = presetValue;
+                    lastAppliedPreset = presetKey;
+                }
+            }
+
+            presetSelect.addEventListener("change", function () {
+                applyPreset(presetSelect.value, false);
+            });
+        }());
+    </script>
 </body>
 </html>

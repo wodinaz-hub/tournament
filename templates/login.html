@@ -5,13 +5,17 @@
 {% block content %}
     <div class="auth-card">
         <h1 class="page-title" style="text-align:center;">Вхід</h1>
-        <p class="section-note" style="text-align:center; margin-top:10px;">Увійдіть у свій акаунт, щоб працювати з турнірами, командами та оцінюванням.</p>
+        <p class="section-note" style="text-align:center; margin-top:10px;">
+            Увійдіть у свій акаунт, щоб працювати з турнірами, командами та оцінюванням.
+        </p>
 
         {% if message %}
             <div class="message-box {% if blocked_until %}error{% else %}warn{% endif %} spacer-top">
                 {{ message }}
                 {% if blocked_until %}
-                    <div class="spacer-top" id="login-block-timer" data-blocked-until="{{ blocked_until_iso }}"><strong>Розблокування через: --</strong></div>
+                    <div class="spacer-top" id="login-block-timer" data-blocked-until="{{ blocked_until_iso }}">
+                        <strong>Розблокування через: --</strong>
+                    </div>
                 {% endif %}
             </div>
         {% endif %}
@@ -42,7 +46,10 @@
                 {% endif %}
             </div>
 
-            <button class="button spacer-top" type="submit" style="width:100%;">Увійти</button>
+            <div class="spacer-top" style="display:flex; gap:12px; flex-wrap:wrap;">
+                <button class="button" type="submit" style="flex:1 1 220px;">Увійти</button>
+                <a href="{% url 'home' %}" class="button secondary" style="flex:1 1 220px; text-decoration:none;">На головну</a>
+            </div>
         </form>
 
         <div class="section-note" style="text-align:center; margin-top:18px;">

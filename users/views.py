@@ -36,7 +36,7 @@ from tournament.forms import (
 )
 from tournament.submission_formats import (
     TASK_SUBMISSION_PRESETS,
-    serialize_submission_fields_definition,
+    task_submission_field_type_choices,
 )
 from tournament.models import (
     Announcement,
@@ -1309,9 +1309,10 @@ def create_task(request, tournament_id=None):
         'mode': 'create',
         'tournament': tournament,
         'task_submission_presets': {
-            key: serialize_submission_fields_definition(value['fields'])
+            key: value
             for key, value in TASK_SUBMISSION_PRESETS.items()
         },
+        'task_submission_field_types': task_submission_field_type_choices(),
         'back_url': (
             reverse('edit_tournament', args=[tournament.id])
             if tournament is not None else (
@@ -1346,9 +1347,10 @@ def edit_task(request, task_id):
         'task': task,
         'tournament': task.tournament,
         'task_submission_presets': {
-            key: serialize_submission_fields_definition(value['fields'])
+            key: value
             for key, value in TASK_SUBMISSION_PRESETS.items()
         },
+        'task_submission_field_types': task_submission_field_type_choices(),
         'back_url': reverse('edit_tournament', args=[task.tournament_id]),
     })
 
@@ -1897,7 +1899,7 @@ def submit_solution(request, task_id):
     submission = Submission.objects.filter(team=team, task=task).first()
 
     if request.method == 'POST':
-        form = SubmissionForm(request.POST, instance=submission, task=task)
+        form = SubmissionForm(request.POST, request.FILES, instance=submission, task=task)
         if form.is_valid():
             submission = form.save(commit=False)
             submission.team = team

@@ -2232,6 +2232,50 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(submission.form_answers["essay_text"], "Моя розгорнута відповідь")
         self.assertEqual(submission.description, "Додатковий коментар")
 
+    def test_submit_solution_saves_file_answer_from_task_format(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(hours=1),
+            end_date=timezone.now() + timedelta(days=1),
+            registration_end=timezone.now() - timedelta(hours=2),
+        )
+        team = Team.objects.create(
+            name="File Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        TournamentRegistration.objects.create(
+            tournament=tournament,
+            team=team,
+            registered_by=self.captain,
+            status=TournamentRegistration.Status.APPROVED,
+        )
+        task = Task.objects.create(
+            tournament=tournament,
+            title="Upload answer",
+            description="desc",
+            requirements="req",
+            must_have="must",
+            submission_fields_config=[
+                {"key": "answer_file", "label": "Файл відповіді", "type": "file", "required": True, "builtin": False},
+            ],
+            is_draft=False,
+            created_by=self.admin_user,
+        )
+
+        response = self.client.post(
+            reverse("submit_solution", args=[task.id]),
+            {
+                "answer_file": SimpleUploadedFile("answer.txt", b"hello world", content_type="text/plain"),
+            },
+        )
+
+        self.assertRedirects(response, reverse("team_detail", args=[team.id]))
+        submission = Submission.objects.get(team=team, task=task)
+        self.assertIn("answer_file", submission.form_answers)
+        self.assertEqual(submission.form_answers["answer_file"]["name"], "answer.txt")
+        self.assertTrue(submission.form_answers["answer_file"]["path"])
+
     def test_submit_solution_is_blocked_after_task_deadline(self):
         now = timezone.now()
         tournament = self.create_tournament(

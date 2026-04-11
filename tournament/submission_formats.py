@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from django import forms
+from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.storage import FileSystemStorage
 
 
 BUILTIN_SUBMISSION_FIELDS = {
@@ -36,7 +40,18 @@ CUSTOM_FIELD_TYPE_CHOICES = {
     "email": forms.EmailField,
     "number": forms.IntegerField,
     "url": forms.URLField,
+    "file": forms.FileField,
 }
+
+TASK_SUBMISSION_FIELD_TYPE_OPTIONS = [
+    ("text", "Короткий текст"),
+    ("textarea", "Великий текст"),
+    ("email", "Email"),
+    ("number", "Число"),
+    ("url", "Посилання"),
+    ("file", "Файл"),
+    ("checkbox", "Позначка"),
+]
 
 TASK_SUBMISSION_PRESETS = {
     "informatics": {
@@ -53,7 +68,7 @@ TASK_SUBMISSION_PRESETS = {
         "label": "Українська мова",
         "fields": [
             {"key": "essay_text", "label": "Текст відповіді", "type": "textarea", "required": True, "builtin": False},
-            {"key": "sources_link", "label": "Посилання на додаткові матеріали", "type": "url", "required": False, "builtin": False},
+            {"key": "answer_file", "label": "Файл з відповіддю", "type": "file", "required": False, "builtin": False},
             {"key": "description", "label": "Коментар до відповіді", "type": "textarea", "required": False, "builtin": True},
         ],
     },
@@ -61,7 +76,7 @@ TASK_SUBMISSION_PRESETS = {
         "label": "Математика",
         "fields": [
             {"key": "answer_text", "label": "Хід розв'язання", "type": "textarea", "required": True, "builtin": False},
-            {"key": "answer_link", "label": "Посилання на фото або файл розв'язання", "type": "url", "required": False, "builtin": False},
+            {"key": "answer_file", "label": "Файл або фото розв'язання", "type": "file", "required": False, "builtin": False},
         ],
     },
     "generic": {
@@ -73,8 +88,16 @@ TASK_SUBMISSION_PRESETS = {
 }
 
 
+def get_submission_file_storage():
+    return FileSystemStorage(location=settings.MEDIA_ROOT, base_url=settings.MEDIA_URL)
+
+
 def submission_preset_choices():
     return [(key, value["label"]) for key, value in TASK_SUBMISSION_PRESETS.items()]
+
+
+def task_submission_field_type_choices():
+    return list(TASK_SUBMISSION_FIELD_TYPE_OPTIONS)
 
 
 def normalize_submission_field_key(value, fallback_label=""):
@@ -138,7 +161,7 @@ def parse_submission_fields_definition(raw_value):
         allowed_types = set(CUSTOM_FIELD_TYPE_CHOICES) | {"checkbox"}
         if field_type not in allowed_types:
             errors.append(
-                f'Рядок {index}: невідомий тип "{field_type}". Доступно: text, textarea, email, number, url, checkbox.'
+                f'Рядок {index}: невідомий тип "{field_type}". Доступно: text, textarea, email, number, url, file, checkbox.'
             )
             continue
 
@@ -225,11 +248,23 @@ def build_submission_response_items(submission):
         elif value in (None, "", []):
             continue
 
+        display_value = value
+        is_link = item["type"] == "url" and bool(value)
+
+        if item["type"] == "file":
+            file_path = value.get("path") if isinstance(value, dict) else value
+            if not file_path:
+                continue
+            display_value = value.get("name") if isinstance(value, dict) else Path(file_path).name
+            value = get_submission_file_storage().url(file_path)
+            is_link = True
+
         response_items.append(
             {
                 "label": item["label"],
                 "value": value,
-                "is_link": item["type"] == "url" and bool(value),
+                "display_value": display_value,
+                "is_link": is_link,
             }
         )
 

@@ -75,9 +75,9 @@
                                 {% for item in row_submission.submission.response_items %}
                                     {{ item.label }}:
                                     {% if item.is_link %}
-                                        <a href="{{ item.value }}">{{ item.value }}</a>
+                                        <a href="{{ item.value }}">{{ item.display_value|default:item.value }}</a>
                                     {% else %}
-                                        {{ item.value }}
+                                        {{ item.display_value|default:item.value }}
                                     {% endif %}
                                     <br>
                                 {% empty %}
@@ -139,9 +139,9 @@
                                 {% for item in row_submission.submission.response_items %}
                                     {{ item.label }}:
                                     {% if item.is_link %}
-                                        <a href="{{ item.value }}">{{ item.value }}</a>
+                                        <a href="{{ item.value }}">{{ item.display_value|default:item.value }}</a>
                                     {% else %}
-                                        {{ item.value }}
+                                        {{ item.display_value|default:item.value }}
                                     {% endif %}
                                     <br>
                                 {% empty %}

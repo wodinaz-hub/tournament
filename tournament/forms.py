@@ -915,6 +915,7 @@ class SubmissionForm(forms.ModelForm):
 
         self.answer_config = resolve_task_submission_fields_config(self.task)
         self.dynamic_answer_keys = []
+        self.existing_form_answers = getattr(self.instance, 'form_answers', {}) or {}
         self.fields['github_link'].required = False
         self.fields['video_link'].required = False
         self.fields['live_demo'].required = False
@@ -931,7 +932,6 @@ class SubmissionForm(forms.ModelForm):
             if field_name in self.BUILTIN_FIELD_ORDER and field_name not in configured_builtin_keys:
                 self.fields.pop(field_name)
 
-        form_answers = getattr(self.instance, 'form_answers', {}) or {}
         ordered_keys = []
 
         for item in self.answer_config:
@@ -953,6 +953,8 @@ class SubmissionForm(forms.ModelForm):
                 widget = forms.NumberInput(attrs={'class': 'form-input'})
             elif item['type'] == 'url':
                 widget = forms.URLInput(attrs={'class': 'form-input'})
+            elif item['type'] == 'file':
+                widget = forms.ClearableFileInput(attrs={'class': 'form-input'})
             else:
                 widget = forms.TextInput(attrs={'class': 'form-input'})
 
@@ -960,7 +962,7 @@ class SubmissionForm(forms.ModelForm):
                 required=item['required'],
                 label=item['label'],
                 widget=widget,
-                initial=form_answers.get(field_key),
+                initial=None if item['type'] == 'file' else self.existing_form_answers.get(field_key),
             )
             self.dynamic_answer_keys.append(field_key)
 
@@ -973,7 +975,12 @@ class SubmissionForm(forms.ModelForm):
             if item.get('builtin'):
                 continue
             value = cleaned_data.get(item['key'])
-            if value in (None, ''):
+            if item['type'] == 'file':
+                if value:
+                    cleaned_answers[item['key']] = value
+                else:
+                    cleaned_answers[item['key']] = self.existing_form_answers.get(item['key'], '')
+            elif value in (None, ''):
                 cleaned_answers[item['key']] = ''
             else:
                 cleaned_answers[item['key']] = value
@@ -982,7 +989,30 @@ class SubmissionForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        instance.form_answers = self.cleaned_data.get('form_answers', {})
+        from pathlib import Path
+        from uuid import uuid4
+        from .submission_formats import get_submission_file_storage
+
+        saved_answers = {}
+        storage = get_submission_file_storage()
+        for item in self.answer_config:
+            if item.get('builtin'):
+                continue
+
+            value = self.cleaned_data.get('form_answers', {}).get(item['key'], '')
+            if item['type'] == 'file' and value:
+                if hasattr(value, 'name'):
+                    original_name = Path(value.name).name
+                    upload_dir = f"submission_answers/task_{self.task.id if self.task else 'unknown'}"
+                    file_name = f"{uuid4().hex}_{original_name}"
+                    file_path = storage.save(f"{upload_dir}/{file_name}", value)
+                    value = {
+                        'path': file_path,
+                        'name': original_name,
+                    }
+            saved_answers[item['key']] = value
+
+        instance.form_answers = saved_answers
         if commit:
             instance.save()
         return instance

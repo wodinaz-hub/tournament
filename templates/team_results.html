@@ -61,10 +61,10 @@ body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#ee
 {% for item in row.submission.response_items %}
 {{ item.label }}:
 {% if item.is_link %}
-<a href="{{ item.value }}">{{ item.value }}</a>
-{% else %}
-{{ item.value }}
-{% endif %}
+  <a href="{{ item.value }}">{{ item.display_value|default:item.value }}</a>
+  {% else %}
+  {{ item.display_value|default:item.value }}
+  {% endif %}
 <br>
 {% empty %}
 -

@@ -72,13 +72,13 @@
             margin: 18px 0 22px;
         }
         .checkbox-row input { width: auto; margin: 0; }
-        .actions {
+        .actions, .row-actions {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
-            margin-top: 10px;
         }
-        .btn, .back {
+        .actions { margin-top: 10px; }
+        .btn, .back, .ghost-btn, .danger-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -88,10 +88,73 @@
             text-decoration: none;
             font-weight: 700;
             font-size: 15px;
+            cursor: pointer;
         }
-        .btn { border: none; background: #2563eb; color: #fff; cursor: pointer; }
+        .btn { border: none; background: #2563eb; color: #fff; }
         .back { background: #eef4ff; color: #2563eb; }
-        @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+        .ghost-btn {
+            border: 1px solid #c9d8ef;
+            background: #fff;
+            color: #2563eb;
+        }
+        .danger-btn {
+            border: 1px solid #fecaca;
+            background: #fff5f5;
+            color: #b91c1c;
+            min-height: 40px;
+        }
+        .format-builder {
+            margin-top: 16px;
+            border: 1px solid #dbe5f3;
+            border-radius: 16px;
+            padding: 18px;
+            background: #f8fbff;
+        }
+        .builder-header, .builder-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(180px, 0.8fr) auto;
+            gap: 12px;
+            align-items: center;
+        }
+        .builder-header {
+            font-size: 14px;
+            font-weight: 700;
+            color: #516074;
+            margin-bottom: 10px;
+            padding: 0 2px;
+        }
+        .builder-row {
+            margin-bottom: 10px;
+        }
+        .builder-row input,
+        .builder-row select {
+            margin: 0;
+        }
+        .builder-empty {
+            display: none;
+            padding: 14px;
+            border-radius: 12px;
+            background: #fff;
+            border: 1px dashed #c9d8ef;
+            color: #516074;
+        }
+        .hidden-config {
+            display: none;
+        }
+        @media (max-width: 760px) {
+            .grid { grid-template-columns: 1fr; }
+            .builder-header {
+                display: none;
+            }
+            .builder-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 14px;
+                border-radius: 14px;
+                background: #fff;
+                border: 1px solid #dbe5f3;
+            }
+        }
     </style>
 </head>
 <body>
@@ -108,9 +171,8 @@
             </div>
 
             <div class="hint">
-                Для опублікованого завдання потрібно вказати окремі дати старту та завершення прийому відповідей.
-                Нижче також можна налаштувати, у якому саме форматі команда повинна подати свою відповідь:
-                використати готовий шаблон або змінити його під себе.
+                Для опублікованого завдання потрібно вказати окремі дату старту та дедлайн. Нижче ви також можете
+                обрати готовий шаблон формату відповіді й відредагувати його під себе.
             </div>
 
             {% if form.non_field_errors %}
@@ -119,6 +181,10 @@
 
             <form method="post">
                 {% csrf_token %}
+
+                <div class="hidden-config">
+                    {{ form.submission_fields_definition }}
+                </div>
 
                 {% if form.tournament.is_hidden %}
                     {{ form.tournament }}
@@ -171,24 +237,36 @@
                 <div class="section">
                     <h2>Формат відповіді</h2>
                     <div class="field-help">
-                        Оберіть заготовку, наприклад для інформатики чи української мови, а потім за потреби відредагуйте поля нижче.
-                        Формат одного рядка: <strong>ключ|Назва поля|тип|required/optional</strong>.
+                        Оберіть заготовку або складіть свій формат. У кожному рядку є лише назва поля й тип.
                         Має залишитися хоча б одне поле.
                     </div>
 
-                    <div class="grid" style="margin-top:14px;">
+                    <div class="grid" style="margin-top: 14px;">
                         <div class="field span2">
                             <label for="{{ form.submission_preset.id_for_label }}">Шаблон формату відповіді</label>
                             {{ form.submission_preset }}
                             {% if form.submission_preset.errors %}<div class="field-errors">{{ form.submission_preset.errors }}</div>{% endif %}
                         </div>
+                    </div>
 
-                        <div class="field span2">
-                            <label for="{{ form.submission_fields_definition.id_for_label }}">Поля відповіді</label>
-                            {{ form.submission_fields_definition }}
-                            {% if form.submission_fields_definition.errors %}<div class="field-errors">{{ form.submission_fields_definition.errors }}</div>{% endif %}
+                    <div class="format-builder">
+                        <div class="builder-header">
+                            <div>Назва поля</div>
+                            <div>Тип</div>
+                            <div></div>
+                        </div>
+                        <div id="submission-fields-rows"></div>
+                        <div id="submission-fields-empty" class="builder-empty">
+                            Поки що немає полів. Додайте хоча б одне поле формату відповіді.
+                        </div>
+                        <div class="row-actions" style="margin-top: 14px;">
+                            <button type="button" class="ghost-btn" id="add-submission-field">Додати поле</button>
                         </div>
                     </div>
+
+                    {% if form.submission_fields_definition.errors %}
+                        <div class="field-errors">{{ form.submission_fields_definition.errors }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="section">
@@ -215,37 +293,195 @@
     </div>
 
     {{ task_submission_presets|json_script:"task-submission-presets" }}
+    {{ task_submission_field_types|json_script:"task-submission-field-types" }}
     <script>
         (function () {
             const presetSelect = document.getElementById("id_submission_preset");
-            const definitionField = document.getElementById("id_submission_fields_definition");
-            const presetsScript = document.getElementById("task-submission-presets");
-            if (!presetSelect || !definitionField || !presetsScript) {
-                return;
+            const hiddenDefinitionField = document.getElementById("id_submission_fields_definition");
+            const rowsContainer = document.getElementById("submission-fields-rows");
+            const emptyState = document.getElementById("submission-fields-empty");
+            const addButton = document.getElementById("add-submission-field");
+            const presets = JSON.parse(document.getElementById("task-submission-presets").textContent || "{}");
+            const typeChoices = JSON.parse(document.getElementById("task-submission-field-types").textContent || "[]");
+            let rows = [];
+            let lastPresetKey = presetSelect ? presetSelect.value : "generic";
+
+            function escapeHtml(value) {
+                return (value || "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
             }
 
-            const presets = JSON.parse(presetsScript.textContent);
-            let lastAppliedPreset = presetSelect.value;
+            function serializeRows() {
+                const serialized = rows
+                    .filter(row => (row.label || "").trim() && (row.type || "").trim())
+                    .map(row => {
+                        const required = row.required === false ? "optional" : "required";
+                        return `${row.key}|${(row.label || "").trim()}|${row.type}|${required}`;
+                    });
+                hiddenDefinitionField.value = serialized.join("\n");
+            }
 
-            function applyPreset(presetKey, force) {
-                if (!presets[presetKey]) {
+            function updateEmptyState() {
+                emptyState.style.display = rows.length ? "none" : "block";
+            }
+
+            function renderRows() {
+                rowsContainer.innerHTML = rows.map((row, index) => {
+                    const options = typeChoices.map(([value, label]) => {
+                        const selected = row.type === value ? "selected" : "";
+                        const disabled = row.builtin && row.type !== value ? "disabled" : "";
+                        return `<option value="${value}" ${selected} ${disabled}>${escapeHtml(label)}</option>`;
+                    }).join("");
+
+                    return `
+                        <div class="builder-row" data-index="${index}">
+                            <input type="text" value="${escapeHtml(row.label)}" placeholder="Назва поля" data-role="label">
+                            <select data-role="type">${options}</select>
+                            <button type="button" class="danger-btn" data-role="remove">Видалити</button>
+                        </div>
+                    `;
+                }).join("");
+
+                updateEmptyState();
+                serializeRows();
+            }
+
+            function addRow(row) {
+                rows.push({
+                    key: row.key,
+                    label: row.label || "",
+                    type: row.type || "text",
+                    required: row.required !== false,
+                    builtin: !!row.builtin,
+                });
+                renderRows();
+            }
+
+            function buildNewCustomRow() {
+                const nextIndex = rows.filter(row => !row.builtin).length + 1;
+                return {
+                    key: `custom_field_${nextIndex}`,
+                    label: "",
+                    type: "text",
+                    required: true,
+                    builtin: false,
+                };
+            }
+
+            function parseDefinition(rawValue) {
+                return (rawValue || "")
+                    .split("\n")
+                    .map(line => line.trim())
+                    .filter(Boolean)
+                    .map((line, index) => {
+                        const parts = line.split("|");
+                        const key = (parts[0] || "").trim() || `custom_field_${index + 1}`;
+                        const label = (parts[1] || "").trim();
+                        const type = (parts[2] || "text").trim();
+                        const required = ((parts[3] || "required").trim() !== "optional");
+                        const presetBuiltin = Object.values(presets)
+                            .flatMap(preset => preset.fields || [])
+                            .find(item => item.key === key);
+                        return {
+                            key: key,
+                            label: label,
+                            type: type,
+                            required: required,
+                            builtin: !!(presetBuiltin && presetBuiltin.builtin),
+                        };
+                    });
+            }
+
+            function loadPreset(presetKey, forceReplace) {
+                const preset = presets[presetKey];
+                if (!preset) {
                     return;
                 }
-
-                const currentValue = definitionField.value.trim();
-                const presetValue = presets[presetKey].trim();
-                const previousPresetValue = presets[lastAppliedPreset] ? presets[lastAppliedPreset].trim() : "";
-                const canReplace = force || !currentValue || currentValue === previousPresetValue;
-
-                if (canReplace) {
-                    definitionField.value = presetValue;
-                    lastAppliedPreset = presetKey;
+                if (!forceReplace && rows.length) {
+                    return;
                 }
+                rows = (preset.fields || []).map(item => ({
+                    key: item.key,
+                    label: item.label,
+                    type: item.type,
+                    required: item.required !== false,
+                    builtin: !!item.builtin,
+                }));
+                lastPresetKey = presetKey;
+                renderRows();
             }
 
-            presetSelect.addEventListener("change", function () {
-                applyPreset(presetSelect.value, false);
+            rowsContainer.addEventListener("input", function (event) {
+                const rowElement = event.target.closest(".builder-row");
+                if (!rowElement) {
+                    return;
+                }
+                const index = Number(rowElement.dataset.index);
+                if (Number.isNaN(index) || !rows[index]) {
+                    return;
+                }
+                if (event.target.dataset.role === "label") {
+                    rows[index].label = event.target.value;
+                }
+                serializeRows();
             });
+
+            rowsContainer.addEventListener("change", function (event) {
+                const rowElement = event.target.closest(".builder-row");
+                if (!rowElement) {
+                    return;
+                }
+                const index = Number(rowElement.dataset.index);
+                if (Number.isNaN(index) || !rows[index]) {
+                    return;
+                }
+                if (event.target.dataset.role === "type" && !rows[index].builtin) {
+                    rows[index].type = event.target.value;
+                } else if (event.target.dataset.role === "type") {
+                    event.target.value = rows[index].type;
+                }
+                serializeRows();
+            });
+
+            rowsContainer.addEventListener("click", function (event) {
+                const button = event.target.closest("[data-role='remove']");
+                if (!button) {
+                    return;
+                }
+                const rowElement = button.closest(".builder-row");
+                const index = Number(rowElement.dataset.index);
+                if (Number.isNaN(index)) {
+                    return;
+                }
+                rows.splice(index, 1);
+                renderRows();
+            });
+
+            addButton.addEventListener("click", function () {
+                addRow(buildNewCustomRow());
+            });
+
+            if (presetSelect) {
+                presetSelect.addEventListener("change", function () {
+                    const shouldReplace = !rows.length || confirm("Замінити поточний формат відповіді на вибраний шаблон?");
+                    if (!shouldReplace) {
+                        presetSelect.value = lastPresetKey;
+                        return;
+                    }
+                    loadPreset(presetSelect.value, true);
+                });
+            }
+
+            const initialRows = parseDefinition(hiddenDefinitionField.value);
+            if (initialRows.length) {
+                rows = initialRows;
+                renderRows();
+            } else {
+                loadPreset(lastPresetKey || "generic", true);
+            }
         }());
     </script>
 </body>

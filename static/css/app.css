@@ -20,6 +20,24 @@
     --radius-sm: 14px;
 }
 
+:root[data-theme="dark"] {
+    --bg: #0b1220;
+    --bg-soft: #111a2c;
+    --surface: rgba(17, 26, 44, 0.94);
+    --surface-strong: #162238;
+    --border: #23324c;
+    --border-strong: #37517e;
+    --text: #e6eefc;
+    --muted: #99abc8;
+    --primary: #7aa2ff;
+    --primary-strong: #c1d4ff;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --shadow: 0 18px 42px rgba(2, 6, 23, 0.45);
+    --shadow-soft: 0 14px 28px rgba(2, 6, 23, 0.35);
+}
+
 * {
     box-sizing: border-box;
 }
@@ -38,6 +56,12 @@ body {
         linear-gradient(180deg, #eef4ff 0%, #f7fbff 45%, #ffffff 100%);
 }
 
+:root[data-theme="dark"] body {
+    background:
+        radial-gradient(circle at top left, rgba(122, 162, 255, 0.18), transparent 26%),
+        linear-gradient(180deg, #08111f 0%, #0b1220 45%, #0f1728 100%);
+}
+
 [hidden] {
     display: none !important;
 }
@@ -50,6 +74,10 @@ a {
     max-width: 1220px;
     margin: 0 auto;
     padding: 24px 20px 48px;
+}
+
+.page-shell-compact {
+    padding-bottom: 0;
 }
 
 .auth-shell {
@@ -86,6 +114,10 @@ a {
     border: 1px solid var(--border);
     backdrop-filter: blur(14px);
     box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="dark"] .topbar {
+    background: rgba(12, 18, 31, 0.86);
 }
 
 .topbar-brand {
@@ -156,6 +188,12 @@ a {
     background: #fff;
 }
 
+:root[data-theme="dark"] .button-secondary,
+:root[data-theme="dark"] .chip {
+    background: #142037;
+    border-color: #253657;
+}
+
 .button-secondary:hover,
 .chip:hover {
     border-color: var(--border-strong);
@@ -177,6 +215,53 @@ a {
     color: #fff;
     font-size: 11px;
     font-weight: 800;
+}
+
+.preference-stack {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.preference-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.88);
+}
+
+:root[data-theme="dark"] .preference-group {
+    background: rgba(16, 24, 40, 0.88);
+}
+
+.preference-label {
+    padding: 0 6px 0 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.preference-button {
+    min-height: 34px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+}
+
+.preference-button.is-active {
+    background: var(--primary);
+    color: #fff;
 }
 
 .nav-dropdown {
@@ -204,6 +289,10 @@ a {
     z-index: 80;
     display: grid;
     gap: 6px;
+}
+
+:root[data-theme="dark"] .dropdown-menu {
+    background: #111a2b;
 }
 
 .dropdown-menu a {
@@ -236,6 +325,10 @@ a {
     color: #fff;
     background: linear-gradient(135deg, rgba(23, 59, 119, 0.98) 0%, rgba(33, 85, 214, 0.98) 58%, rgba(14, 165, 233, 0.96) 100%);
     box-shadow: 0 18px 36px rgba(17, 24, 39, 0.12);
+}
+
+:root[data-theme="dark"] .hero {
+    box-shadow: 0 18px 36px rgba(2, 6, 23, 0.35);
 }
 
 .hero-content {
@@ -318,6 +411,17 @@ a {
     border: 1px solid var(--border);
     border-radius: 24px;
     box-shadow: var(--shadow);
+}
+
+:root[data-theme="dark"] .section,
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .auth-card,
+:root[data-theme="dark"] .summary-card,
+:root[data-theme="dark"] .quick-card,
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .info-card,
+:root[data-theme="dark"] .item-card {
+    background: var(--surface);
 }
 
 .section,

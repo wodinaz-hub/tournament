@@ -4,6 +4,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            try {
+                const savedTheme = localStorage.getItem("tp-theme") || "light";
+                const savedLanguage = localStorage.getItem("tp-language") || "uk";
+                document.documentElement.dataset.theme = savedTheme;
+                document.documentElement.lang = savedLanguage;
+            } catch (error) {
+                document.documentElement.dataset.theme = "light";
+                document.documentElement.lang = "uk";
+            }
+        }());
+    </script>
     <title>{% block title %}Турнірна платформа{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_head %}{% endblock %}
@@ -13,61 +26,74 @@
         <header class="topbar">
             <div class="topbar-brand">
                 <div>
-                    <div class="brand-title">Турнірна платформа</div>
-                    <div class="brand-subtitle">Турніри, команди, повідомлення, сертифікати та результати в одному просторі.</div>
+                    <div class="brand-title" data-i18n="brand.title">Турнірна платформа</div>
+                    <div class="brand-subtitle" data-i18n="brand.subtitle">Турніри, команди, повідомлення, сертифікати та результати в одному просторі.</div>
                 </div>
             </div>
 
             <div class="auth-actions">
+                <div class="preference-stack" aria-label="Site preferences">
+                    <div class="preference-group">
+                        <span class="preference-label" data-i18n="theme.label">Тема</span>
+                        <button type="button" class="preference-button" data-theme-option="light" aria-pressed="false" data-i18n="theme.light">Світла</button>
+                        <button type="button" class="preference-button" data-theme-option="dark" aria-pressed="false" data-i18n="theme.dark">Темна</button>
+                    </div>
+                    <div class="preference-group">
+                        <span class="preference-label" data-i18n="lang.label">Мова</span>
+                        <button type="button" class="preference-button" data-language-option="uk" aria-pressed="false" data-i18n="lang.uk">UA</button>
+                        <button type="button" class="preference-button" data-language-option="en" aria-pressed="false" data-i18n="lang.en">EN</button>
+                    </div>
+                </div>
+
                 {% if request.user.is_authenticated %}
                     <nav class="nav-links" aria-label="Основна навігація">
-                        <a class="button-secondary" href="{% url 'home' %}">Головна</a>
+                        <a class="button-secondary" href="{% url 'home' %}" data-i18n="nav.home">Головна</a>
                         <a class="button-secondary" href="{% url 'messages' %}">
-                            Повідомлення
+                            <span data-i18n="nav.messages">Повідомлення</span>
                             {% if has_unread_announcements %}
                                 <span class="notify-dot">{{ unread_announcements_count }}</span>
                             {% endif %}
                         </a>
                         <a class="button-secondary" href="{% url 'certificates' %}">
-                            Сертифікати
+                            <span data-i18n="nav.certificates">Сертифікати</span>
                             {% if has_unread_certificates %}
                                 <span class="notify-dot">{{ unread_certificates_count }}</span>
                             {% endif %}
                         </a>
-                        <a class="button-secondary" href="{% url 'archive' %}">Архів</a>
+                        <a class="button-secondary" href="{% url 'archive' %}" data-i18n="nav.archive">Архів</a>
 
                         {% if request.user.is_superuser or request.user.role == 'admin' %}
                             <details class="nav-dropdown">
-                                <summary class="button-secondary">Керування</summary>
+                                <summary class="button-secondary" data-i18n="nav.management">Керування</summary>
                                 <div class="dropdown-menu">
-                                    <div class="dropdown-title">Адмінські розділи</div>
-                                    <a href="{% url 'admin_users' %}">Користувачі</a>
-                                    <a href="{% url 'admin_users' %}?action=create-user">Створити користувача</a>
-                                    <a href="{% url 'admin_active_tournaments' %}">Активні турніри</a>
-                                    <a href="{% url 'admin_inactive_tournaments' %}">Неактивні турніри</a>
-                                    <a href="{% url 'admin_active_tournaments' %}?action=create-tournament">Створити турнір</a>
-                                    <a href="{% url 'admin_teams' %}">Команди</a>
-                                    <a href="{% url 'admin_registrations' %}">Заявки</a>
-                                    <a href="{% url 'admin_submissions' %}">Роботи</a>
-                                    <a href="{% url 'admin_announcements' %}">Оголошення</a>
-                                    <a href="{% url 'admin_certificates' %}">Сертифікати</a>
+                                    <div class="dropdown-title" data-i18n="nav.management.title">Адмінські розділи</div>
+                                    <a href="{% url 'admin_users' %}" data-i18n="nav.users">Користувачі</a>
+                                    <a href="{% url 'admin_users' %}?action=create-user" data-i18n="nav.create_user">Створити користувача</a>
+                                    <a href="{% url 'admin_active_tournaments' %}" data-i18n="nav.active_tournaments">Активні турніри</a>
+                                    <a href="{% url 'admin_inactive_tournaments' %}" data-i18n="nav.inactive_tournaments">Неактивні турніри</a>
+                                    <a href="{% url 'admin_active_tournaments' %}?action=create-tournament" data-i18n="nav.create_tournament">Створити турнір</a>
+                                    <a href="{% url 'admin_teams' %}" data-i18n="nav.teams">Команди</a>
+                                    <a href="{% url 'admin_registrations' %}" data-i18n="nav.registrations">Заявки</a>
+                                    <a href="{% url 'admin_submissions' %}" data-i18n="nav.submissions">Роботи</a>
+                                    <a href="{% url 'admin_announcements' %}" data-i18n="nav.announcements">Оголошення</a>
+                                    <a href="{% url 'admin_certificates' %}" data-i18n="nav.admin_certificates">Сертифікати</a>
                                 </div>
                             </details>
                         {% elif request.user.role == 'participant' %}
-                            <a class="button-secondary" href="{% url 'profile' %}">Профіль</a>
-                            <a class="button-secondary" href="{% url 'my_team' %}">Моя команда</a>
+                            <a class="button-secondary" href="{% url 'profile' %}" data-i18n="nav.profile">Профіль</a>
+                            <a class="button-secondary" href="{% url 'my_team' %}" data-i18n="nav.my_team">Моя команда</a>
                         {% elif request.user.role == 'jury' %}
-                            <a class="button-secondary" href="{% url 'jury_dashboard' %}">Журі</a>
+                            <a class="button-secondary" href="{% url 'jury_dashboard' %}" data-i18n="nav.jury">Журі</a>
                         {% elif request.user.role == 'organizer' %}
-                            <a class="button-secondary" href="{% url 'organizer_dashboard' %}">Мої турніри</a>
-                            <a class="button-secondary" href="{% url 'create_tournament' %}">Створити турнір</a>
+                            <a class="button-secondary" href="{% url 'organizer_dashboard' %}" data-i18n="nav.my_tournaments">Мої турніри</a>
+                            <a class="button-secondary" href="{% url 'create_tournament' %}" data-i18n="nav.create_tournament">Створити турнір</a>
                         {% endif %}
                     </nav>
 
-                    <a class="button" href="{% url 'logout' %}">Вийти</a>
+                    <a class="button" href="{% url 'logout' %}" data-i18n="nav.logout">Вийти</a>
                 {% else %}
-                    <a class="button-secondary" href="{% url 'login' %}">Увійти</a>
-                    <a class="button" href="{% url 'register' %}">Зареєструватися</a>
+                    <a class="button-secondary" href="{% url 'login' %}" data-i18n="nav.login">Увійти</a>
+                    <a class="button" href="{% url 'register' %}" data-i18n="nav.register">Зареєструватися</a>
                 {% endif %}
             </div>
         </header>
@@ -85,6 +111,7 @@
         {% block content %}{% endblock %}
     </div>
 
+    <script src="{% static 'js/ui_preferences.js' %}"></script>
     <script>
         document.addEventListener('click', function (event) {
             document.querySelectorAll('.nav-dropdown[open]').forEach(function (dropdown) {

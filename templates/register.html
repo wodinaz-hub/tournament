@@ -4,10 +4,12 @@
 
 {% block content %}
     <div class="auth-card">
-        <h1 class="page-title" style="text-align:center;">Реєстрація</h1>
-        <p class="section-note" style="text-align:center; margin-top:10px;">Створіть акаунт учасника, щоб подавати заявки на турніри.</p>
+        <h1 class="page-title" style="text-align:center;" data-i18n="register.title">Реєстрація</h1>
+        <p class="section-note" style="text-align:center; margin-top:10px;" data-i18n="register.subtitle">
+            Створіть акаунт учасника, щоб подавати заявки на турніри.
+        </p>
 
-        <div class="message-box info spacer-top">
+        <div class="message-box info spacer-top" data-i18n="register.notice">
             Після реєстрації ми надішлемо лист із посиланням для підтвердження електронної пошти. Увійти на сайт можна буде після переходу за цим посиланням.
         </div>
 
@@ -22,36 +24,36 @@
             {% endif %}
 
             <div class="field-group">
-                <label for="{{ form.username.id_for_label }}">Логін</label>
+                <label for="{{ form.username.id_for_label }}" data-i18n="register.username">Логін</label>
                 {{ form.username }}
                 {% if form.username.errors %}<div class="field-errors">{{ form.username.errors }}</div>{% endif %}
             </div>
 
             <div class="field-group spacer-top">
-                <label for="{{ form.email.id_for_label }}">Електронна пошта</label>
+                <label for="{{ form.email.id_for_label }}" data-i18n="register.email">Електронна пошта</label>
                 {{ form.email }}
                 {% if form.email.errors %}<div class="field-errors">{{ form.email.errors }}</div>{% endif %}
             </div>
 
             <div class="field-group spacer-top">
-                <label for="{{ form.password1.id_for_label }}">Пароль</label>
+                <label for="{{ form.password1.id_for_label }}" data-i18n="register.password">Пароль</label>
                 {{ form.password1 }}
                 {% if form.password1.help_text %}<div class="helptext">{{ form.password1.help_text|safe }}</div>{% endif %}
                 {% if form.password1.errors %}<div class="field-errors">{{ form.password1.errors }}</div>{% endif %}
             </div>
 
             <div class="field-group spacer-top">
-                <label for="{{ form.password2.id_for_label }}">Підтвердження пароля</label>
+                <label for="{{ form.password2.id_for_label }}" data-i18n="register.password_confirm">Підтвердження пароля</label>
                 {{ form.password2 }}
                 {% if form.password2.errors %}<div class="field-errors">{{ form.password2.errors }}</div>{% endif %}
             </div>
 
-            <button class="button-success spacer-top" type="submit" style="width:100%;">Зареєструватися</button>
+            <button class="button-success spacer-top" type="submit" style="width:100%;" data-i18n="register.submit">Зареєструватися</button>
         </form>
 
         <div class="section-note" style="text-align:center; margin-top:18px;">
-            Уже є акаунт?
-            <a href="{% url 'login' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}" style="color:var(--primary); font-weight:700; text-decoration:none;">Увійти</a>
+            <span data-i18n="register.has_account">Уже є акаунт?</span>
+            <a href="{% url 'login' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}" style="color:var(--primary); font-weight:700; text-decoration:none;" data-i18n="register.login_link">Увійти</a>
         </div>
     </div>
 {% endblock %}

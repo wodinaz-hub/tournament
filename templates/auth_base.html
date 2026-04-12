@@ -4,17 +4,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            try {
+                const savedTheme = localStorage.getItem("tp-theme") || "light";
+                const savedLanguage = localStorage.getItem("tp-language") || "uk";
+                document.documentElement.dataset.theme = savedTheme;
+                document.documentElement.lang = savedLanguage;
+            } catch (error) {
+                document.documentElement.dataset.theme = "light";
+                document.documentElement.lang = "uk";
+            }
+        }());
+    </script>
     <title>{% block title %}Турнірна платформа{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <div style="padding: 20px 20px 0;">
-        <a href="{% url 'home' %}" class="button secondary" style="text-decoration:none;">На головну</a>
+    <div class="page-shell page-shell-compact">
+        <header class="topbar">
+            <div class="topbar-brand">
+                <div>
+                    <div class="brand-title" data-i18n="brand.title">Турнірна платформа</div>
+                    <div class="brand-subtitle" data-i18n="brand.subtitle">Турніри, команди, повідомлення, сертифікати та результати в одному просторі.</div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <div class="preference-stack" aria-label="Auth preferences">
+                    <div class="preference-group">
+                        <span class="preference-label" data-i18n="theme.label">Тема</span>
+                        <button type="button" class="preference-button" data-theme-option="light" aria-pressed="false" data-i18n="theme.light">Світла</button>
+                        <button type="button" class="preference-button" data-theme-option="dark" aria-pressed="false" data-i18n="theme.dark">Темна</button>
+                    </div>
+                    <div class="preference-group">
+                        <span class="preference-label" data-i18n="lang.label">Мова</span>
+                        <button type="button" class="preference-button" data-language-option="uk" aria-pressed="false" data-i18n="lang.uk">UA</button>
+                        <button type="button" class="preference-button" data-language-option="en" aria-pressed="false" data-i18n="lang.en">EN</button>
+                    </div>
+                </div>
+                <a href="{% url 'home' %}" class="button-secondary" data-i18n="auth.home">На головну</a>
+            </div>
+        </header>
     </div>
     <main class="auth-shell">
         {% block content %}{% endblock %}
     </main>
+    <script src="{% static 'js/ui_preferences.js' %}"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

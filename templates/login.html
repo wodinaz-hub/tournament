@@ -4,8 +4,8 @@
 
 {% block content %}
     <div class="auth-card">
-        <h1 class="page-title" style="text-align:center;">Вхід</h1>
-        <p class="section-note" style="text-align:center; margin-top:10px;">
+        <h1 class="page-title" style="text-align:center;" data-i18n="login.title">Вхід</h1>
+        <p class="section-note" style="text-align:center; margin-top:10px;" data-i18n="login.subtitle">
             Увійдіть у свій акаунт, щоб працювати з турнірами, командами та оцінюванням.
         </p>
 
@@ -14,7 +14,7 @@
                 {{ message }}
                 {% if blocked_until %}
                     <div class="spacer-top" id="login-block-timer" data-blocked-until="{{ blocked_until_iso }}">
-                        <strong>Розблокування через: --</strong>
+                        <strong data-i18n="login.unblock_prefix">Розблокування через:</strong> --
                     </div>
                 {% endif %}
             </div>
@@ -31,7 +31,7 @@
             {% endif %}
 
             <div class="field-group">
-                <label for="{{ form.username.id_for_label }}">Логін</label>
+                <label for="{{ form.username.id_for_label }}" data-i18n="login.username">Логін</label>
                 {{ form.username }}
                 {% if form.username.errors %}
                     <div class="field-errors">{{ form.username.errors }}</div>
@@ -39,7 +39,7 @@
             </div>
 
             <div class="field-group spacer-top">
-                <label for="{{ form.password.id_for_label }}">Пароль</label>
+                <label for="{{ form.password.id_for_label }}" data-i18n="login.password">Пароль</label>
                 {{ form.password }}
                 {% if form.password.errors %}
                     <div class="field-errors">{{ form.password.errors }}</div>
@@ -47,14 +47,14 @@
             </div>
 
             <div class="spacer-top" style="display:flex; gap:12px; flex-wrap:wrap;">
-                <button class="button" type="submit" style="flex:1 1 220px;">Увійти</button>
-                <a href="{% url 'home' %}" class="button secondary" style="flex:1 1 220px; text-decoration:none;">На головну</a>
+                <button class="button" type="submit" style="flex:1 1 220px;" data-i18n="login.submit">Увійти</button>
+                <a href="{% url 'home' %}" class="button-secondary" style="flex:1 1 220px; text-decoration:none;" data-i18n="auth.home">На головну</a>
             </div>
         </form>
 
         <div class="section-note" style="text-align:center; margin-top:18px;">
-            Ще не маєте акаунта?
-            <a href="{% url 'register' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}" style="color:var(--primary); font-weight:700; text-decoration:none;">Зареєструватися</a>
+            <span data-i18n="login.no_account">Ще не маєте акаунта?</span>
+            <a href="{% url 'register' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}" style="color:var(--primary); font-weight:700; text-decoration:none;" data-i18n="login.register_link">Зареєструватися</a>
         </div>
     </div>
 {% endblock %}
@@ -78,12 +78,12 @@
             function tick() {
                 const diffMs = blockedUntil.getTime() - Date.now();
                 if (diffMs <= 0) {
-                    timer.textContent = 'Блокування завершилося. Можна спробувати ще раз.';
+                    timer.textContent = window.TournamentUIPreferences.getTranslation('login.unblocked');
                     return;
                 }
 
                 const diffSeconds = Math.ceil(diffMs / 1000);
-                timer.textContent = 'Розблокування через: ' + formatRemaining(diffSeconds);
+                timer.textContent = window.TournamentUIPreferences.getTranslation('login.unblock_prefix') + ' ' + formatRemaining(diffSeconds);
                 window.setTimeout(tick, 1000);
             }
 

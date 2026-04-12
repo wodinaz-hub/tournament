@@ -5,14 +5,14 @@
 {% block content %}
     <section class="hero">
         <div class="hero-content">
-            <div class="hero-kicker">Публічний доступ</div>
-            <h1>Турніри, заявки, результати та сповіщення без зайвих переходів.</h1>
-            <p>На цій сторінці ви можете побачити: активні, майбутні та завершені турніри, новини платформи, повідомлення від системи та підсумковий лідерборд.</p>
+            <div class="hero-kicker" data-i18n="home.hero.kicker">Публічний доступ</div>
+            <h1 data-i18n="home.hero.title">Турніри, заявки, результати та сповіщення без зайвих переходів.</h1>
+            <p data-i18n="home.hero.text">На цій сторінці ви можете побачити: активні, майбутні та завершені турніри, новини платформи, повідомлення від системи та підсумковий лідерборд.</p>
         </div>
         <div class="hero-side">
-            <div class="hero-stat"><strong>{{ tournament_rows|length }}</strong>Усього опублікованих турнірів</div>
-            <div class="hero-stat"><strong>{{ featured_tournaments|length }}</strong>Турніри з відкритою реєстрацією</div>
-            <div class="hero-stat"><strong>{{ finished_tournaments|length }}</strong>Завершені події з підсумками</div>
+            <div class="hero-stat"><strong>{{ tournament_rows|length }}</strong><span data-i18n="home.stat.total">Усього опублікованих турнірів</span></div>
+            <div class="hero-stat"><strong>{{ featured_tournaments|length }}</strong><span data-i18n="home.stat.open">Турніри з відкритою реєстрацією</span></div>
+            <div class="hero-stat"><strong>{{ finished_tournaments|length }}</strong><span data-i18n="home.stat.finished">Завершені події з підсумками</span></div>
         </div>
     </section>
 

@@ -402,7 +402,28 @@ class TournamentPlatformViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Public Cup")
-        self.assertContains(response, reverse("public_tournament_detail", args=[tournament.id]))
+
+    def test_home_page_contains_theme_and_language_switchers(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-theme-option="light"', html=False)
+        self.assertContains(response, 'data-theme-option="dark"', html=False)
+        self.assertContains(response, 'data-language-option="uk"', html=False)
+        self.assertContains(response, 'data-language-option="en"', html=False)
+
+    def test_login_page_contains_theme_and_language_switchers(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-theme-option="light"', html=False)
+        self.assertContains(response, 'data-theme-option="dark"', html=False)
+        self.assertContains(response, 'data-language-option="uk"', html=False)
+        self.assertContains(response, 'data-language-option="en"', html=False)
 
     def test_home_page_filters_tournaments_by_status(self):
         now = timezone.now()

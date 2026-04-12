@@ -37,9 +37,9 @@
 
 {% block content %}
     <section class="message-hero">
-        <div class="hero-kicker">Центр повідомлень</div>
-        <h1 class="page-title" style="color:#fff;">Повідомлення платформи</h1>
-        <p class="card-text" style="color:rgba(255,255,255,0.88); margin:0;">
+        <div class="hero-kicker" data-i18n="messages.hero.kicker">Центр повідомлень</div>
+        <h1 class="page-title" style="color:#fff;" data-i18n="messages.hero.title">Повідомлення платформи</h1>
+        <p class="card-text" style="color:rgba(255,255,255,0.88); margin:0;" data-i18n="messages.hero.text">
             Тут зібрані особисті статуси команди, загальні оголошення та турнірні події:
             старт реєстрації, старт завдань, дедлайни, завершення оцінювання й системні оновлення.
         </p>
@@ -54,8 +54,8 @@
     <section class="card">
         <div class="section-head">
             <div>
-                <h2>Фільтри повідомлень</h2>
-                <div class="section-note">Перемикай між особистими, загальними та турнірними повідомленнями без перезавантаження сторінки.</div>
+                <h2 data-i18n="messages.filters.title">Фільтри повідомлень</h2>
+                <div class="section-note" data-i18n="messages.filters.note">Перемикай між особистими, загальними та турнірними повідомленнями без перезавантаження сторінки.</div>
             </div>
         </div>
 
@@ -67,12 +67,17 @@
                     data-message-filter="{{ option.value }}"
                     aria-pressed="{% if filter_category == option.value %}true{% else %}false{% endif %}"
                 >
-                    {{ option.label }}
+                    <span
+                        {% if option.value == 'all' %}data-i18n="messages.filter.all"{% endif %}
+                        {% if option.value == 'personal' %}data-i18n="messages.filter.personal"{% endif %}
+                        {% if option.value == 'general' %}data-i18n="messages.filter.general"{% endif %}
+                        {% if option.value == 'tournament' %}data-i18n="messages.filter.tournament"{% endif %}
+                    >{{ option.label }}</span>
                 </a>
             {% endfor %}
         </div>
 
-        <div class="message-box info spacer-top" id="message-filter-empty" hidden>
+        <div class="message-box info spacer-top" id="message-filter-empty" hidden data-i18n="messages.filter.empty">
             За цим фільтром повідомлень поки немає.
         </div>
 
@@ -90,7 +95,7 @@
                     <p class="card-text spacer-top">{{ item.body }}</p>
                 </article>
             {% empty %}
-                <div class="empty">Поки що для вас немає повідомлень.</div>
+                <div class="empty" data-i18n="messages.empty">Поки що для вас немає повідомлень.</div>
             {% endfor %}
         </div>
     </section>

@@ -883,11 +883,19 @@ def admin_certificates(request):
             tournament_queryset=tournament_queryset,
         )
         if template_form.is_valid():
-            template = template_form.save(commit=False)
-            template.uploaded_by = request.user
-            template.save()
-            messages.success(request, 'Шаблон сертифіката успішно завантажено.')
-            return redirect('admin_certificates')
+            try:
+                template = template_form.save(commit=False)
+                template.uploaded_by = request.user
+                template.save()
+            except Exception:
+                logger.exception("Failed to upload certificate template", extra={"user_id": request.user.id})
+                messages.error(
+                    request,
+                    'Не вдалося завантажити шаблон сертифіката. Перевірте формат файлу та спробуйте ще раз.',
+                )
+            else:
+                messages.success(request, 'Шаблон сертифіката успішно завантажено.')
+                return redirect('admin_certificates')
     else:
         template_form = CertificateTemplateForm(tournament_queryset=tournament_queryset)
 

@@ -8,6 +8,7 @@ from statistics import mean
 from urllib.error import HTTPError, URLError
 from PIL import Image, ImageDraw, ImageFont
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -182,6 +183,8 @@ def build_certificate_pdf_response(certificate):
     )
     if template is None or not template.background_image:
         raise ValidationError('Для цього типу сертифіката ще не завантажено шаблон.')
+    if not getattr(template.background_image, 'path', None) or not os.path.exists(template.background_image.path):
+        raise ValidationError('Файл шаблону сертифіката не знайдено. Завантажте шаблон ще раз.')
 
     with Image.open(template.background_image.path) as source_image:
         image = source_image.convert('RGB')
@@ -883,6 +886,7 @@ def admin_certificates(request):
             template = template_form.save(commit=False)
             template.uploaded_by = request.user
             template.save()
+            messages.success(request, 'Шаблон сертифіката успішно завантажено.')
             return redirect('admin_certificates')
     else:
         template_form = CertificateTemplateForm(tournament_queryset=tournament_queryset)
@@ -1183,12 +1187,16 @@ def issue_participant_certificates(request, tournament_id):
         tournament=tournament,
         status=TournamentRegistration.Status.APPROVED,
     ).select_related('team', 'team__captain_user').prefetch_related('members', 'team__participants')
-    issue_certificates_for_tournament(
+    created_count = issue_certificates_for_tournament(
         tournament=tournament,
         issued_by=request.user,
         certificate_type=Certificate.CertificateType.PARTICIPANT,
         registrations=registrations,
     )
+    if created_count:
+        messages.success(request, f'Згенеровано сертифікати учасників: {created_count}.')
+    else:
+        messages.info(request, 'Усі сертифікати учасників для цього турніру вже створені.')
     return redirect(get_post_redirect(request, reverse('admin_certificates')))
 
 
@@ -1208,12 +1216,18 @@ def issue_winner_certificates(request, tournament_id):
             team=winner_team,
             status=TournamentRegistration.Status.APPROVED,
         ).select_related('team', 'team__captain_user').prefetch_related('members', 'team__participants')
-        issue_certificates_for_tournament(
+        created_count = issue_certificates_for_tournament(
             tournament=tournament,
             issued_by=request.user,
             certificate_type=Certificate.CertificateType.WINNER,
             registrations=registrations,
         )
+        if created_count:
+            messages.success(request, f'Згенеровано сертифікати переможців: {created_count}.')
+        else:
+            messages.info(request, 'Сертифікати переможців уже створені.')
+    else:
+        messages.warning(request, 'Немає результатів, за якими можна визначити переможця.')
     return redirect(get_post_redirect(request, reverse('admin_certificates')))
 
 
@@ -1240,7 +1254,13 @@ def download_certificate_pdf(request, certificate_id):
 
     try:
         return build_certificate_pdf_response(certificate)
-    except ValidationError:
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0] if exc.messages else 'Не вдалося згенерувати сертифікат.')
+        fallback = reverse('admin_certificates') if is_admin_user(request.user) else reverse('profile')
+        return redirect(fallback)
+    except Exception:
+        logger.exception("Failed to build certificate PDF", extra={"certificate_id": certificate.id})
+        messages.error(request, 'Не вдалося згенерувати PDF сертифіката. Перевірте шаблон зображення і спробуйте ще раз.')
         fallback = reverse('admin_certificates') if is_admin_user(request.user) else reverse('profile')
         return redirect(fallback)
 

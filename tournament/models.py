@@ -1,4 +1,4 @@
-﻿from django.conf import settings
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -71,6 +71,12 @@ class Tournament(models.Model):
         on_delete=models.SET_NULL,
         related_name="tournaments_evaluation_finished",
         verbose_name="Оцінювання завершив",
+    )
+    banner_image = models.ImageField(
+        upload_to="tournament_banners/",
+        null=True,
+        blank=True,
+        verbose_name="Банер турніру",
     )
 
 

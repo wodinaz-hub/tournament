@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 from datetime import datetime
 
@@ -255,6 +255,7 @@ class TournamentForm(forms.ModelForm):
             'max_team_members',
             'max_teams',
             'jury_users',
+            'banner_image',
             'is_draft',
         ]
         widgets = {
@@ -265,6 +266,7 @@ class TournamentForm(forms.ModelForm):
             'max_team_members': forms.NumberInput(attrs={'class': 'form-input', 'min': 1}),
             'max_teams': forms.NumberInput(attrs={'class': 'form-input'}),
             'jury_users': forms.SelectMultiple(attrs={'class': 'form-input', 'size': 6}),
+            'banner_image': forms.FileInput(attrs={'class': 'form-input'}),
             'is_draft': forms.CheckboxInput(),
         }
 
@@ -1073,6 +1075,23 @@ class CertificateTemplateForm(forms.ModelForm):
         self.fields['tournament'].queryset = tournament_queryset
         if allow_global:
             self.fields['tournament'].empty_label = 'Глобальний шаблон для всіх турнірів'
+
+    def clean_background_image(self):
+        from pathlib import Path
+
+        image = self.cleaned_data.get('background_image')
+        if image is None:
+            return image
+
+        content_type = getattr(image, 'content_type', '') or ''
+        if content_type and not content_type.startswith('image/'):
+            raise ValidationError('Завантажте файл зображення у форматі PNG, JPG або JPEG.')
+
+        allowed_suffixes = {'.png', '.jpg', '.jpeg'}
+        if Path(image.name).suffix.lower() not in allowed_suffixes:
+            raise ValidationError('Підтримуються лише шаблони PNG, JPG або JPEG.')
+
+        return image
 
 
 

@@ -40,6 +40,9 @@
 </head>
 <body>
 <div class="wrap">
+<div style="margin-bottom:14px;">
+<a class="back" href="{% url 'home' %}">На головну</a>
+</div>
 <div class="card">
 <h1>{{ task.title }}</h1>
 <p class="meta">Турнір: <strong>{{ task.tournament.name }}</strong></p>

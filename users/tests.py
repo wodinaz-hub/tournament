@@ -1239,6 +1239,33 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(download_response["Content-Type"], "application/pdf")
         self.assertIn("attachment;", download_response["Content-Disposition"])
 
+    def test_download_certificate_without_template_redirects_instead_of_500(self):
+        tournament = self.create_tournament(
+            start_date=timezone.now() - timedelta(days=2),
+            end_date=timezone.now() - timedelta(hours=1),
+            registration_end=timezone.now() - timedelta(days=3),
+        )
+        team = Team.objects.create(
+            name="No Template Team",
+            captain_user=self.captain,
+            captain_name="Captain",
+            captain_email="captain@example.com",
+        )
+        certificate = Certificate.objects.create(
+            tournament=tournament,
+            team=team,
+            certificate_type=Certificate.CertificateType.PARTICIPANT,
+            recipient_user=self.captain,
+            recipient_name="Captain",
+            recipient_email="captain@example.com",
+            issued_by=self.admin_user,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("download_certificate_pdf", args=[certificate.id]))
+
+        self.assertRedirects(response, reverse("admin_certificates"))
+
     def test_admin_can_export_results_csv(self):
         tournament = self.create_tournament(
             start_date=timezone.now() - timedelta(hours=4),

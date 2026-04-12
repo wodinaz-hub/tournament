@@ -159,6 +159,9 @@
 </head>
 <body>
     <div class="wrap">
+        <div style="margin-bottom: 14px;">
+            <a class="back" href="{% url 'home' %}">На головну</a>
+        </div>
         <div class="card">
             <h1>{% if mode == 'edit' %}Редагувати завдання{% else %}Створити завдання{% endif %}</h1>
 

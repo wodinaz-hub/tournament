@@ -26,6 +26,16 @@
         .field label { font-weight: 700; }
         .form-input { width: 100%; min-height: 42px; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font: inherit; }
         .template-box { border: 1px dashed #bfdbfe; background: #f8fbff; }
+        .help-box, .message-box {
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-top: 12px;
+            line-height: 1.6;
+        }
+        .help-box { background: #eef4ff; border: 1px solid #dbeafe; color: #1e3a8a; }
+        .message-box.success { background: #ecfdf5; color: #166534; border: 1px solid #bbf7d0; }
+        .message-box.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .message-box.warning, .message-box.info { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
     </style>
 </head>
 <body>
@@ -34,7 +44,8 @@
         <div>
             <h1 style="margin:0 0 6px;">Сертифікати</h1>
             <div class="meta">
-                Адміністратор може завантажити шаблон сертифіката, згенерувати іменні PDF та експортувати результати турніру у CSV, який відкривається в Google Sheets.
+                Тут адміністратор завантажує шаблон сертифіката, створює сертифікати учасників або переможців
+                і завантажує готові PDF.
             </div>
         </div>
         <div class="actions">
@@ -43,10 +54,26 @@
         </div>
     </div>
 
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <div class="message-box {% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     <div class="grid">
         <div class="card col template-box">
             <h2 style="margin-top:0;">Завантажити шаблон</h2>
-            <form method="post" enctype="multipart/form-data">
+            <div class="help-box">
+                Що треба завантажити:
+                <br>1. Зображення сертифіката у форматі <strong>PNG</strong>, <strong>JPG</strong> або <strong>JPEG</strong>.
+                <br>2. На макеті має бути вільне місце для імені учасника, назви турніру та дати.
+                <br>3. Можна завантажити окремий шаблон для конкретного турніру або глобальний шаблон для всіх.
+            </div>
+            <form method="post" enctype="multipart/form-data" style="margin-top:16px;">
                 {% csrf_token %}
                 <div class="field">
                     <label for="{{ template_form.tournament.id_for_label }}">Турнір</label>
@@ -57,11 +84,11 @@
                     {{ template_form.certificate_type }}
                 </div>
                 <div class="field">
-                    <label for="{{ template_form.background_image.id_for_label }}">Фон / макет</label>
+                    <label for="{{ template_form.background_image.id_for_label }}">Макет сертифіката</label>
                     {{ template_form.background_image }}
                 </div>
                 {% if template_form.errors %}
-                    <div class="meta" style="color:#b91c1c;">{{ template_form.errors }}</div>
+                    <div class="message-box error">{{ template_form.errors }}</div>
                 {% endif %}
                 <button class="btn" type="submit">Завантажити шаблон</button>
             </form>
@@ -97,11 +124,11 @@
                         <a class="btn-secondary" href="{% url 'export_tournament_results_csv' tournament.id %}">Експорт CSV результатів</a>
                         <form method="post" action="{% url 'issue_participant_certificates' tournament.id %}">
                             {% csrf_token %}
-                            <button class="btn" type="submit">Сертифікати учасників</button>
+                            <button class="btn" type="submit">Згенерувати сертифікати учасників</button>
                         </form>
                         <form method="post" action="{% url 'issue_winner_certificates' tournament.id %}">
                             {% csrf_token %}
-                            <button class="btn-danger" type="submit">Сертифікати переможців</button>
+                            <button class="btn-danger" type="submit">Згенерувати сертифікати переможців</button>
                         </form>
                     </div>
                 </div>
@@ -141,8 +168,3 @@
 </div>
 </body>
 </html>
-
-
-
-
-

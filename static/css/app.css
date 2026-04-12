@@ -558,30 +558,93 @@ textarea {
     }
 }
 
-@media (max-width: 760px) {
-    .page-shell {
-        padding: 16px 14px 40px;
-    }
+@media (max-width: 760px) { ... }
 
-    .topbar {
-        position: static;
-    }
+/* Banners Section */
+.banners-section {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
 
-    .brand-title {
-        font-size: 24px;
-    }
+.banners-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
 
-    .dropdown-menu {
-        left: 0;
-        right: auto;
-        min-width: min(280px, calc(100vw - 40px));
-    }
+.banner-card {
+    position: relative;
+    height: 220px;
+    border-radius: var(--radius-lg);
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 24px;
+    text-decoration: none;
+    color: #fff;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
+}
 
-    .auth-shell {
-        align-items: start;
-    }
+.banner-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
 
-    .auth-card {
-        padding: 24px;
+.banner-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.banner-info {
+    position: relative;
+    z-index: 2;
+}
+
+.banner-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.banner-desc {
+    margin: 6px 0 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.5;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.banner-default {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+@media (max-width: 480px) {
+    .banners-grid {
+        grid-template-columns: 1fr;
+    }
+    .banner-card {
+        height: 180px;
     }
 }

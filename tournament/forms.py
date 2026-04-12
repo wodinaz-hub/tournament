@@ -255,6 +255,7 @@ class TournamentForm(forms.ModelForm):
             'max_team_members',
             'max_teams',
             'jury_users',
+            'banner_image',
             'is_draft',
         ]
         widgets = {
@@ -265,6 +266,7 @@ class TournamentForm(forms.ModelForm):
             'max_team_members': forms.NumberInput(attrs={'class': 'form-input', 'min': 1}),
             'max_teams': forms.NumberInput(attrs={'class': 'form-input'}),
             'jury_users': forms.SelectMultiple(attrs={'class': 'form-input', 'size': 6}),
+            'banner_image': forms.FileInput(attrs={'class': 'form-input'}),
             'is_draft': forms.CheckboxInput(),
         }
 

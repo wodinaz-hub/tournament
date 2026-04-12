@@ -382,6 +382,22 @@ class TournamentForm(forms.ModelForm):
 
         return cleaned_data
 
+    def clean_banner_image(self):
+        banner = self.cleaned_data.get('banner_image')
+        if not banner:
+            return banner
+        
+        # Перевірка типу файлу
+        content_type = getattr(banner, 'content_type', '')
+        if content_type and not content_type.startswith('image/'):
+            raise forms.ValidationError('Будь ласка, завантажте коректне зображення.')
+        
+        # Перевірка розміру (наприклад, до 5 МБ)
+        if banner.size > 5 * 1024 * 1024:
+            raise forms.ValidationError('Файл занадто великий (макс. 5 МБ).')
+            
+        return banner
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.registration_fields_config = self.cleaned_data.get('registration_fields_config', [])

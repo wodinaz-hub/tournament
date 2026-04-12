@@ -483,11 +483,23 @@ def home(request):
 @login_required
 def messages_view(request):
     message_items = build_user_message_items(request.user)
+    filter_category = request.GET.get('category', 'all')
+    filter_choices = [
+        {'value': 'all', 'label': 'Усі'},
+        {'value': 'personal', 'label': 'Особисті'},
+        {'value': 'general', 'label': 'Загальні'},
+        {'value': 'tournament', 'label': 'Турнірні'},
+    ]
+    valid_filter_values = {choice['value'] for choice in filter_choices}
+    if filter_category not in valid_filter_values:
+        filter_category = 'all'
     now = timezone.now()
     request.user.announcements_seen_at = now
     request.user.save(update_fields=['announcements_seen_at'])
     return render(request, 'messages.html', {
         'message_items': message_items,
+        'filter_category': filter_category,
+        'filter_choices': filter_choices,
         **build_notification_nav_context(request.user),
     })
 

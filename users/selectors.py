@@ -74,7 +74,7 @@ def build_user_message_items(user):
         "system": "Система",
     }
 
-    def add_item(*, key, title, body, created_at, kind="system", tournament=None):
+    def add_item(*, key, title, body, created_at, kind="system", tournament=None, bucket="general"):
         if created_at is None or created_at > now or key in seen_keys:
             return
         seen_keys.add(key)
@@ -87,6 +87,7 @@ def build_user_message_items(user):
                 "kind": kind,
                 "kind_label": kind_labels.get(kind, "Система"),
                 "tournament": tournament,
+                "bucket": bucket,
             }
         )
 
@@ -98,6 +99,7 @@ def build_user_message_items(user):
             created_at=announcement.created_at,
             kind="announcement",
             tournament=announcement.tournament,
+            bucket="tournament" if announcement.tournament_id else "general",
         )
 
     if getattr(user, "is_authenticated", False):
@@ -111,6 +113,7 @@ def build_user_message_items(user):
                     created_at=tournament.registration_start,
                     kind="event",
                     tournament=tournament,
+                    bucket="tournament",
                 )
 
     if getattr(user, "is_authenticated", False) and is_participant_user(user):
@@ -129,6 +132,7 @@ def build_user_message_items(user):
                 created_at=registration.created_at,
                 kind="status",
                 tournament=tournament,
+                bucket="personal",
             )
             if registration.status == TournamentRegistration.Status.APPROVED:
                 if tournament.start_date is not None:
@@ -139,6 +143,7 @@ def build_user_message_items(user):
                         created_at=tournament.start_date,
                         kind="event",
                         tournament=tournament,
+                        bucket="personal",
                     )
                 if tournament.end_date is not None:
                     deadline_24h = tournament.end_date - timedelta(hours=24)
@@ -150,6 +155,7 @@ def build_user_message_items(user):
                             created_at=deadline_24h,
                             kind="deadline",
                             tournament=tournament,
+                            bucket="personal",
                         )
                 if tournament.is_finished:
                     add_item(
@@ -159,6 +165,7 @@ def build_user_message_items(user):
                         created_at=tournament.end_date,
                         kind="finished",
                         tournament=tournament,
+                        bucket="personal",
                     )
                     if tournament.evaluation_results_ready:
                         add_item(
@@ -168,6 +175,7 @@ def build_user_message_items(user):
                             created_at=tournament.evaluation_finished_at or tournament.end_date,
                             kind="system",
                             tournament=tournament,
+                            bucket="personal",
                         )
 
     items.sort(key=lambda item: item["created_at"], reverse=True)

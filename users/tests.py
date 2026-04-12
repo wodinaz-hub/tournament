@@ -1055,6 +1055,36 @@ class TournamentPlatformViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f"Старт реєстрації: {tournament.name}")
 
+    def test_messages_page_shows_filter_tabs_and_buckets(self):
+        tournament = self.create_tournament(
+            registration_start=timezone.now() - timedelta(hours=2),
+            registration_end=timezone.now() + timedelta(days=1),
+            start_date=timezone.now() + timedelta(days=2),
+            end_date=timezone.now() + timedelta(days=3),
+        )
+        Announcement.objects.create(
+            title="Загальна новина",
+            message="Повідомлення для всіх користувачів.",
+            created_by=self.admin_user,
+        )
+        Announcement.objects.create(
+            title="Турнірна новина",
+            message="Оновлення по турніру.",
+            created_by=self.admin_user,
+            tournament=tournament,
+        )
+        self.client.force_login(self.participant_user)
+
+        response = self.client.get(reverse("messages"), {"category": "personal"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-message-filter="personal"', html=False)
+        self.assertContains(response, 'data-message-filter="general"', html=False)
+        self.assertContains(response, 'data-message-filter="tournament"', html=False)
+        self.assertContains(response, 'data-message-bucket="general"', html=False)
+        self.assertContains(response, 'data-message-bucket="tournament"', html=False)
+        self.assertContains(response, 'applyMessageFilter', html=False)
+
     def test_archive_page_shows_finished_tournament_and_my_results_link(self):
         tournament = self.create_tournament(
             start_date=timezone.now() - timedelta(days=2),

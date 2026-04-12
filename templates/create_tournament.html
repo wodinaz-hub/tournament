@@ -174,7 +174,7 @@
                 <div class="error-box">{{ form.non_field_errors }}</div>
             {% endif %}
 
-            <form method="post" id="tournament-form">
+            <form method="post" id="tournament-form" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="form-grid">
                     <section class="section-card">
@@ -194,6 +194,11 @@
                                 <label>Опис форми реєстрації команди</label>
                                 {{ form.registration_form_description }}
                                 {% if form.registration_form_description.errors %}<div class="field-errors">{{ form.registration_form_description.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group field-span-2">
+                                <label>Банер турніру</label>
+                                {{ form.banner_image }}
+                                {% if form.banner_image.errors %}<div class="field-errors">{{ form.banner_image.errors }}</div>{% endif %}
                             </div>
                             <div class="field-group field-span-2">
                                 <label>Журі турніру</label>

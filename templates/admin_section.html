@@ -123,12 +123,13 @@
             <section class="form-card">
                 <div class="section-head"><div><h3 class="section-title" style="font-size:26px">Створити турнір</h3><div class="section-note">Форма вбудована прямо в розділ активних турнірів.</div></div><a class="btn-ghost" href="{% url 'admin_active_tournaments' %}">Сховати форму</a></div>
                 {% if tournament_form.non_field_errors %}<div class="err">{{ tournament_form.non_field_errors }}</div>{% endif %}
-                <form method="post" action="{% url 'create_tournament' %}" id="inline-tournament-form">
+                <form method="post" action="{% url 'create_tournament' %}" id="inline-tournament-form" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="fields">
                         <div class="span2"><label>Назва</label>{{ tournament_form.name }}{% if tournament_form.name.errors %}<div class="err">{{ tournament_form.name.errors }}</div>{% endif %}</div>
                         <div class="span2"><label>Опис</label>{{ tournament_form.description }}{% if tournament_form.description.errors %}<div class="err">{{ tournament_form.description.errors }}</div>{% endif %}</div>
                         <div class="span2"><label>Опис форми реєстрації команди</label>{{ tournament_form.registration_form_description }}{% if tournament_form.registration_form_description.errors %}<div class="err">{{ tournament_form.registration_form_description.errors }}</div>{% endif %}</div>
+                        <div class="span2"><label>Банер турніру</label>{{ tournament_form.banner_image }}{% if tournament_form.banner_image.errors %}<div class="err">{{ tournament_form.banner_image.errors }}</div>{% endif %}</div>
                         <div class="span2"><label>Журі турніру</label>{{ tournament_form.jury_users }}{% if tournament_form.jury_users.errors %}<div class="err">{{ tournament_form.jury_users.errors }}</div>{% endif %}</div>
                         <div class="span2"><label>Доступні месенджери для команди</label>{{ tournament_form.allowed_contact_methods }}{% if tournament_form.allowed_contact_methods.errors %}<div class="err">{{ tournament_form.allowed_contact_methods.errors }}</div>{% endif %}</div>
                     </div>

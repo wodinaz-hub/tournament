@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 import io
 import os
 import logging
@@ -1055,7 +1055,7 @@ def create_tournament(request):
         return redirect(reverse('admin_active_tournaments') + '?action=create-tournament')
 
     if request.method == 'POST':
-        form = TournamentForm(request.POST)
+        form = TournamentForm(request.POST, request.FILES)
         if form.is_valid():
             form.instance.created_by = request.user
             tournament = form.save()
@@ -1093,7 +1093,7 @@ def edit_tournament(request, tournament_id):
         return redirect(get_dashboard_url_for_user(request.user))
 
     if request.method == 'POST':
-        form = TournamentForm(request.POST, instance=tournament)
+        form = TournamentForm(request.POST, request.FILES, instance=tournament)
         if form.is_valid():
             form.save()
             return redirect(reverse('admin_active_tournaments') if is_admin_user(request.user) else get_dashboard_url_for_user(request.user))

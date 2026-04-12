@@ -1232,6 +1232,15 @@ class TournamentPlatformViewTests(TestCase):
                 certificate_type=Certificate.CertificateType.PARTICIPANT,
             ).exists()
         )
+        template = CertificateTemplate.objects.get(
+            tournament=tournament,
+            certificate_type=Certificate.CertificateType.PARTICIPANT,
+        )
+
+        preview_response = self.client.get(reverse("preview_certificate_template", args=[template.id]))
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(preview_response["Content-Type"], {"image/png", "image/jpeg"})
 
         download_response = self.client.get(reverse("download_certificate_pdf", args=[certificate.id]))
 

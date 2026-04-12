@@ -105,7 +105,7 @@
                     <div class="meta">
                         Завантажив: {{ template.uploaded_by.username }}<br>
                         Дата: {{ template.created_at }}<br>
-                        Файл: <a href="{{ template.background_image.url }}">переглянути макет</a>
+                        Файл: <a href="{% url 'preview_certificate_template' template.id %}">переглянути макет</a>
                     </div>
                 </div>
             {% empty %}

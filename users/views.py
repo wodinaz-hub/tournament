@@ -2,6 +2,7 @@ import csv
 import io
 import os
 import logging
+import mimetypes
 from datetime import timedelta
 from statistics import mean
 
@@ -15,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse
+from django.http import FileResponse, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.encoding import force_str
@@ -1237,6 +1238,39 @@ def issue_winner_certificates(request, tournament_id):
     else:
         messages.warning(request, 'Немає результатів, за якими можна визначити переможця.')
     return redirect(get_post_redirect(request, reverse('admin_certificates')))
+
+
+@login_required
+def preview_certificate_template(request, template_id):
+    if not is_admin_user(request.user):
+        return redirect('redirect_by_role')
+
+    template = get_object_or_404(
+        CertificateTemplate.objects.select_related('tournament', 'uploaded_by'),
+        id=template_id,
+    )
+
+    try:
+        template.background_image.open("rb")
+    except Exception:
+        logger.exception(
+            "Failed to open certificate template preview",
+            extra={"template_id": template.id},
+        )
+        messages.error(
+            request,
+            'Не вдалося відкрити макет сертифіката. Перевірте, чи файл шаблону ще доступний.',
+        )
+        return redirect(reverse('admin_certificates'))
+
+    filename = os.path.basename(template.background_image.name or "certificate-template")
+    content_type, _ = mimetypes.guess_type(filename)
+    response = FileResponse(
+        template.background_image.file,
+        content_type=content_type or "application/octet-stream",
+    )
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
 
 
 @login_required

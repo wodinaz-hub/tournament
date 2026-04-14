@@ -10,7 +10,6 @@
             <p>Тут зібрано вашу базову інформацію, команди, турніри, сертифікати та останні оголошення платформи.</p>
         </div>
         <div class="hero-side">
-            <div class="hero-stat"><strong>{{ my_teams|length }}</strong>Ваших команд</div>
             <div class="hero-stat"><strong>{{ tournaments_with_state|length }}</strong>Турнірів у профілі</div>
             <div class="hero-stat"><strong>{{ certificates|length }}</strong>Доступних сертифікатів</div>
         </div>
@@ -28,23 +27,21 @@
     <section class="section">
         <div class="section-head">
             <div>
-                <h2 class="section-title">Мої команди</h2>
-                <div class="section-note">Команди, у яких ви є контактною особою (капітаном) або учасником.</div>
+                <h2 class="section-title">Моя команда</h2>
+                <div class="section-note">Команда, у якій ви є контактною особою (капітаном) або учасником.</div>
             </div>
         </div>
 
-        {% if my_teams %}
+        {% if my_team %}
             <div class="list spacer-top">
-                {% for team in my_teams %}
-                    <div class="item-card">
-                        <h3>{{ team.name }}</h3>
-                        <div class="meta-list spacer-top">Контактна особа (капітан): {{ team.captain_name }}</div>
-                        <div class="toolbar spacer-top">
-                            <a class="button" href="{% url 'team_detail' team.id %}">Відкрити</a>
-                            <a class="button-secondary" href="{% url 'team_results' team.id %}">Результати</a>
-                        </div>
+                <div class="item-card">
+                    <h3>{{ my_team.name }}</h3>
+                    <div class="meta-list spacer-top">Контактна особа (капітан): {{ my_team.captain_name }}</div>
+                    <div class="toolbar spacer-top">
+                        <a class="button" href="{% url 'team_detail' my_team.id %}">Відкрити</a>
+                        <a class="button-secondary" href="{% url 'team_results' my_team.id %}">Результати</a>
                     </div>
-                {% endfor %}
+                </div>
             </div>
         {% else %}
             <p class="empty spacer-top">У вас ще немає команди.</p>

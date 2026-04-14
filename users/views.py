@@ -1473,6 +1473,52 @@ def jury_dashboard(request):
 
 
 @login_required
+
+
+@login_required
+def delete_task(request, task_id):
+    if not can_manage_tournaments(request.user):
+        return redirect('redirect_by_role')
+    if request.method != 'POST':
+        return redirect(get_dashboard_url_for_user(request.user))
+
+    task = get_object_or_404(Task, id=task_id)
+    if not can_manage_tournament_instance(request.user, task.tournament):
+        return redirect('redirect_by_role')
+    task.delete()
+    fallback = reverse('admin_active_tournaments') if is_admin_user(request.user) else get_dashboard_url_for_user(request.user)
+    return redirect(get_post_redirect(request, fallback))
+
+
+@login_required
+def jury_dashboard(request):
+    if request.user.role != 'jury' and not request.user.is_superuser:
+        return redirect('redirect_by_role')
+
+    tournaments = Tournament.objects.filter(is_draft=False).prefetch_related(
+        'tasks__submissions__team',
+    ).order_by('-start_date')
+    if not request.user.is_superuser:
+        tournaments = tournaments.filter(jury_users=request.user)
+
+    tournament_rows = []
+    for tournament in tournaments:
+        submissions = Submission.objects.filter(
+            task__tournament=tournament,
+        ).select_related('team', 'task')
+        tournament_rows.append({
+            'tournament': tournament,
+            'teams_count': submissions.values('team_id').distinct().count(),
+            'submissions_count': submissions.count(),
+        })
+
+    return render(request, 'jury_dashboard.html', {
+        'tournament_rows': tournament_rows,
+        **build_notification_nav_context(request.user),
+    })
+
+
+@login_required
 def jury_tournament_detail(request, tournament_id):
     if request.user.role != 'jury' and not request.user.is_superuser:
         return redirect('redirect_by_role')
@@ -1553,6 +1599,23 @@ def submit_evaluation(request, submission_id):
         )
 
     return redirect('jury_tournament_detail', tournament_id=submission.task.tournament_id)
+        'participants',
+        'registrations__tournament',
+    ).distinct()
+
+    visible_tournaments = list(
+        Tournament.objects.filter(is_draft=False).order_by('-start_date')
+    )
+
+    my_registrations = list(TournamentRegistration.objects.select_related(
+        'tournament',
+        'team',
+        'team__captain_user',
+    ).prefetch_related('team__participants', 'members').filter(
+        Q(team__captain_user=request.user) | Q(members__user=request.user)
+    ).distinct())
+
+    my_registration_by_tournament_id = {}
 
 
 @login_required
@@ -1626,17 +1689,6 @@ def profile_view(request):
             ),
         })
 
-    announcements = build_public_announcements()
-    certificates = build_user_certificates_queryset(request.user)
-
-    return render(request, 'profile.html', {
-        'profile_user': request.user,
-        'my_teams': my_teams,
-        'tournaments_with_state': tournaments_with_state,
-        'announcements': announcements,
-        'certificates': certificates,
-        **build_notification_nav_context(request.user),
-    })
 
 
 @login_required
